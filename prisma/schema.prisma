@@ -1,0 +1,532 @@
+// Sistema de Calificación — XIII Entrada Folklórica Universitaria Nacional Trinidad 2026
+// Módulo A: Entrada Folklórica (grupos de danza)
+// Módulo B: Moperita y Ñusta de Bolivia 2026
+// Modelo de datos según prompt-sistema-calificacion.md
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────
+
+enum Role {
+  ADMIN
+  JURADO
+  NOTARIO
+  CONTROL // Nuevo: personal de control de la Entrada (Módulo A)
+}
+
+enum EditionStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum ModuleType {
+  ENTRADA_FOLKLORICA // Módulo A: grupos de danza
+  MOPERITA_NUSTA     // Módulo B: certamen de belleza
+}
+
+enum CategoryStatus {
+  DRAFT
+  OPEN
+  VOTING
+  CLOSED
+}
+
+enum EntryStatus {
+  PENDING      // pendiente
+  IN_SCORING   // en calificación
+  CLOSED       // cerrado — no se aceptan más votos
+}
+
+enum RubricStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ScoreStatus {
+  DRAFT
+  SUBMITTED
+  VOID
+}
+
+enum ScoringRule {
+  MEAN         // promedio simple
+  TRIMMED_MEAN // promedio recortado (descarta max y min)
+}
+
+enum LiveVisibility {
+  ALWAYS
+  AFTER_ENTRY
+  AFTER_CATEGORY
+  HIDDEN
+}
+
+enum ChainScope {
+  SCORE
+  AUDIT
+}
+
+enum NotaryActStatus {
+  DRAFT
+  SIGNED
+  VOIDED
+}
+
+enum PenaltyType {
+  YELLOW_FLAG       // banderola amarilla (retraso 10-15 min)
+  RED_FLAG          // banderola roja (retraso >15 min o indisciplina)
+  ORDER_VIOLATION   // incumplimiento del orden de ingreso
+  MANUAL_DEDUCTION  // descuento manual (ej: bailarines ebrios)
+  DISQUALIFICATION  // descalificación (solo ADMIN)
+}
+
+enum RunwayType {
+  GALA    // ropa de gala
+  CASUAL  // ropa casual
+  TIPICA  // ropa típica
+}
+
+// ─── Edition ────────────────────────────────────────────────
+
+model Edition {
+  id                   String         @id @default(cuid())
+  year                 Int            @unique
+  name                 String         // "XIII Entrada Folklórica Universitaria Nacional"
+  venue                String         // "Trinidad, Beni"
+  status               EditionStatus  @default(DRAFT)
+  scoringRule           ScoringRule    @default(MEAN)
+  quorum               Float          @default(1.0) // 1.0 = 100%
+  publicLiveVisibility  LiveVisibility @default(HIDDEN) // "sobre cerrado" por defecto
+  tieBreakOrder        String?        // JSON array de criterios para desempate
+  decimals             Int            @default(2) // decimales de redondeo
+  autoDisqualify       Boolean        @default(false) // ¿descalificación automática?
+  resultsRevealed      Boolean        @default(false) // ¿resultados revelados?
+  adminConfirmedAt     DateTime?      // primera confirmación (ADMIN)
+  adminConfirmedBy     String?        // userId del ADMIN que confirmó
+  notaryConfirmedAt    DateTime?      // segunda confirmación (NOTARIO)
+  notaryConfirmedBy    String?        // userId del NOTARIO que confirmó
+  startsAt             DateTime?
+  endsAt               DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  categories           Category[]
+  fraternities         Fraternity[]
+  juryAssignments      JuryAssignment[]
+  auditLogs            AuditLog[]
+  notaryActs           NotaryAct[]
+  chainStates          ChainState[]
+  danceGroups          DanceGroup[]
+  eventConfigs         EventConfig[]
+}
+
+// ─── Category ───────────────────────────────────────────────
+
+model Category {
+  id              String         @id @default(cuid())
+  editionId       String
+  name            String         // "Entrada Folklórica" | "Moperita" | "Ñusta"
+  slug            String         // "entrada-folklorica" | "moperita" | "nusta"
+  moduleType      ModuleType     @default(MOPERITA_NUSTA)
+  region          String?        // descriptive
+  order           Int
+  status          CategoryStatus @default(DRAFT)
+  activeRubricId  String?
+  minVotesToClose Int            @default(5) // mínimo de votos para cerrar
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  edition         Edition        @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  participants    Participant[]
+  entries         Entry[]
+  rubrics         Rubric[]
+  runways         Runway[]
+
+  @@unique([editionId, slug])
+  @@unique([editionId, order])
+}
+
+// ─── Fraternity ─────────────────────────────────────────────
+
+model Fraternity {
+  id             String       @id @default(cuid())
+  editionId      String
+  name           String       // "Fraternidad Bolivia"
+  university     String       // "UMSA"
+  faculty        String?      // facultad/carrera/unidad académica
+  city           String
+  department     String
+  logoUrl        String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  edition        Edition      @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  participants   Participant[]
+  danceGroups    DanceGroup[]
+
+  @@unique([editionId, name])
+}
+
+// ─── DanceGroup (Módulo A: Entrada Folklórica) ──────────────
+
+model DanceGroup {
+  id               String      @id @default(cuid())
+  editionId        String
+  fraternityId     String
+  danceName        String      // nombre de la danza
+  numberOfDancers  Int         // número de bailarines (mínimo 50 para nacionales)
+  entryOrder       Int?        // orden de ingreso (asignado por sorteo)
+  arrivalTime      DateTime?   // hora de llegada registrada por CONTROL
+  arrivalRegisteredBy String?  // userId del CONTROL que registró la llegada
+  status           EntryStatus @default(PENDING)
+  isDisqualified   Boolean     @default(false)
+  disqualifyReason String?
+  disqualifiedAt   DateTime?
+  disqualifiedBy   String?     // userId del ADMIN que descalificó
+
+  // Checklist de inscripción
+  hasCaratula      Boolean     @default(false) // carátula
+  hasMonografia    Boolean     @default(false) // monografía de mínimo 4 hojas
+  hasDancerList    Boolean     @default(false) // lista de bailarines con C.I.
+  hasInvitation    Boolean     @default(false) // carta de invitación si es fraternidad externa
+
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  edition          Edition     @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  fraternity       Fraternity  @relation(fields: [fraternityId], references: [id], onDelete: Cascade)
+  danceScores      DanceScore[]
+  penalties        Penalty[]
+
+  @@unique([editionId, entryOrder])
+  @@unique([editionId, fraternityId]) // una fraternidad solo un grupo por edición
+}
+
+// ─── DanceScore (voto de jurado para grupo de danza — Módulo A) ──
+
+model DanceScore {
+  id               String      @id @default(cuid())
+  danceGroupId     String
+  juryId           String      // userId del jurado
+  coreografia      Float       // 1-100
+  vestimenta       Float       // 1-100
+  entusiasmo       Float       // 1-100
+  rawTotal         Float       // coreografía×0.40 + vestimenta×0.30 + entusiasmo×0.30
+  status           ScoreStatus @default(SUBMITTED)
+  observations     String?
+  submittedAt      DateTime    @default(now())
+  payloadHash      String?
+  clientUuid       String?     @unique // idempotencia
+  voidedAt         DateTime?
+  voidReason       String?
+  voidedBy         String?     // userId del admin que anuló
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  danceGroup       DanceGroup  @relation(fields: [danceGroupId], references: [id], onDelete: Cascade)
+  jury             User        @relation(fields: [juryId], references: [id], onDelete: Cascade)
+
+  // Regla clave: un jurado vota UNA sola vez por grupo
+  // Índice parcial real en la migración SQL para status != VOID
+  @@unique([danceGroupId, juryId])
+}
+
+// ─── Penalty (penalizaciones — Módulo A) ────────────────────
+
+model Penalty {
+  id              String      @id @default(cuid())
+  danceGroupId    String
+  type            PenaltyType
+  points          Float       @default(0) // puntos a descontar (calculados o manuales)
+  observation     String?
+  registeredAt    DateTime    @default(now())
+  registeredBy    String      // userId del CONTROL o ADMIN que registró
+  isVoided        Boolean     @default(false)
+  voidedAt        DateTime?
+  voidReason      String?
+  voidedBy        String?     // userId del ADMIN que anuló
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  danceGroup      DanceGroup  @relation(fields: [danceGroupId], references: [id], onDelete: Cascade)
+}
+
+// ─── Runway (pasarela — Módulo B) ───────────────────────────
+
+model Runway {
+  id           String      @id @default(cuid())
+  categoryId   String
+  type         RunwayType
+  name         String      // "Ropa de Gala", "Ropa Casual", "Ropa Típica"
+  weight       Float       @default(0.3333) // peso de esta pasarela en la nota total
+  order        Int
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  category     Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  entries      Entry[]
+
+  @@unique([categoryId, type])
+  @@unique([categoryId, order])
+}
+
+// ─── Participant ────────────────────────────────────────────
+
+model Participant {
+  id             String     @id @default(cuid())
+  categoryId     String
+  fraternityId   String
+  fullName       String
+  photoUrl       String?
+  career         String?
+  bio            String?
+  studentId      String?    // private, only ADMIN
+  isAdult        Boolean    @default(false) // mayoría de edad verificada
+  hasMatricula   Boolean    @default(false) // matrícula 2026 verificada
+  musicUrl       String?    // música (máx. 3 minutos)
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  category       Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  fraternity     Fraternity @relation(fields: [fraternityId], references: [id], onDelete: Cascade)
+  entries        Entry[]
+
+  @@unique([categoryId, fraternityId])
+}
+
+// ─── Entry (turno de pasarela — Módulo B) ───────────────────
+
+model Entry {
+  id             String      @id @default(cuid())
+  categoryId     String
+  participantId  String
+  runwayId       String?     // NULL para Módulo A; referencia a Runway para Módulo B
+  order          Int         // orden en la pasarela
+  status         EntryStatus @default(PENDING)
+  votingOpensAt  DateTime?
+  votingClosesAt DateTime?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  category       Category    @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  participant    Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  runway         Runway?     @relation(fields: [runwayId], references: [id], onDelete: SetNull)
+  scores         Score[]
+
+  @@unique([categoryId, participantId, runwayId]) // una participante + una pasarela = un entry
+}
+
+// ─── User ───────────────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String
+  email          String?   @unique
+  code           String?   @unique // código ej: "JUR-01", "CTRL-01"
+  passwordHash   String?           // para ADMIN/NOTARIO
+  pinHash        String?           // para JURADO y CONTROL
+  role           Role
+  isActive       Boolean   @default(true)
+  isLocked       Boolean   @default(false)  // bloqueo por intentos fallidos
+  lockedUntil    DateTime?                  // fin del bloqueo temporal
+  failedAttempts Int       @default(0)      // intentos fallidos consecutivos
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  juryAssignments JuryAssignment[]
+  scores          Score[]
+  danceScores     DanceScore[]
+  auditLogs       AuditLog[]
+}
+
+// ─── JuryAssignment (panel único por edición) ───────────────
+// No tiene categoryId: un jurado del panel califica TODAS las categorías.
+
+model JuryAssignment {
+  id           String   @id @default(cuid())
+  editionId    String
+  userId       String
+  isPresident  Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  assignedModule ModuleType? // NULL = ambos módulos; o solo uno
+  lastSeenAt   DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  edition      Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([editionId, userId])
+}
+
+// ─── Rubric (versionada — Módulo B) ─────────────────────────
+
+model Rubric {
+  id           String       @id @default(cuid())
+  categoryId   String
+  version      Int
+  status       RubricStatus @default(DRAFT)
+  totalPoints  Float        @default(40.0)
+  activatedAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  category     Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  criteria     Criterion[]
+  scores       Score[]
+
+  @@unique([categoryId, version])
+}
+
+// ─── Criterion (Módulo B) ───────────────────────────────────
+
+model Criterion {
+  id             String      @id @default(cuid())
+  rubricId       String
+  name           String
+  description    String?
+  maxPoints      Float       @default(10.0)
+  weight         Float       @default(0.25) // 25%
+  order          Int
+  appliesToRunway RunwayType? // NULL = aplica a todas; TIPICA/CASUAL = aplica solo a esa
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  rubric         Rubric      @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  scoreItems     ScoreItem[]
+
+  @@unique([rubricId, order])
+}
+
+// ─── Score (voto inmutable — Módulo B) ──────────────────────
+// SUBMITTED scores cannot be modified. Only VOID changes status.
+
+model Score {
+  id             String      @id @default(cuid())
+  entryId        String
+  juryId         String      // userId del jurado
+  rubricId       String
+  status         ScoreStatus @default(DRAFT)
+  rawTotal       Float?
+  weightedTotal  Float?
+  submittedAt    DateTime?
+  payloadHash    String?
+  previousHash   String?
+  chainHash      String?
+  voidedAt       DateTime?
+  voidReason     String?
+  voidedBy       String?     // userId of admin who voided
+  clientUuid     String?     @unique // for idempotency
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  entry          Entry       @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  jury           User        @relation(fields: [juryId], references: [id], onDelete: Cascade)
+  rubric         Rubric      @relation(fields: [rubricId], references: [id], onDelete: Cascade)
+  items          ScoreItem[]
+
+  // Regla clave: un jurado vota UNA sola vez por entry (candidata+pasarela)
+  @@unique([entryId, juryId])
+}
+
+// ─── ScoreItem ──────────────────────────────────────────────
+
+model ScoreItem {
+  id           String    @id @default(cuid())
+  scoreId      String
+  criterionId  String
+  points       Float
+
+  score        Score     @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  criterion    Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
+
+  @@unique([scoreId, criterionId])
+}
+
+// ─── EventConfig (configuración editable por ADMIN) ─────────
+
+model EventConfig {
+  id              String     @id @default(cuid())
+  editionId       String
+  key             String     // ej: "moduleA.criteria.weights", "moduleB.runway.weights"
+  value           Json       // valor serializado
+  description     String?    // descripción para el UI
+  lockedAt        DateTime?  // se bloquea cuando existen votos
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  edition         Edition    @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@unique([editionId, key])
+}
+
+// ─── AuditLog (append-only) ─────────────────────────────────
+
+model AuditLog {
+  id            String   @id @default(cuid())
+  editionId     String
+  actorId       String?
+  type          String   // e.g. "AUTH_LOGIN_SUCCESS", "SCORE_SUBMITTED", "SCORE_VOIDED",
+                         // "PENALTY_REGISTERED", "PENALTY_VOIDED", "DISQUALIFICATION",
+                         // "CONFIG_CHANGED", "OPENING_ADMIN_CONFIRMED", "OPENING_NOTARY_CONFIRMED"
+  entityType    String?  // e.g. "Score", "DanceScore", "DanceGroup", "Penalty", "User", "EventConfig"
+  entityId      String?
+  metadata      Json?
+  previousHash  String?
+  hash          String?
+  sequence      Int?
+  createdAt     DateTime @default(now())
+
+  edition       Edition  @relation(fields: [editionId], references: [id], onDelete: Cascade)
+  actor         User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([editionId, type])
+  @@index([editionId, createdAt])
+}
+
+// ─── NotaryAct ──────────────────────────────────────────────
+
+model NotaryAct {
+  id                 String           @id @default(cuid())
+  editionId          String
+  categoryId         String?
+  status             NotaryActStatus  @default(DRAFT)
+  finalHash          String?
+  positionsSnapshot  Json?
+  pdfKey             String?
+  notaryName         String?
+  folio              String?
+  verificationCode   String?          @unique
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  edition            Edition          @relation(fields: [editionId], references: [id], onDelete: Cascade)
+}
+
+// ─── ChainState ─────────────────────────────────────────────
+
+model ChainState {
+  id            String     @id @default(cuid())
+  editionId     String
+  scope         ChainScope
+  lastHash      String     @default("GENESIS")
+  lastSequence  Int        @default(0)
+  updatedAt     DateTime   @updatedAt
+
+  edition       Edition    @relation(fields: [editionId], references: [id], onDelete: Cascade)
+
+  @@unique([editionId, scope])
+}
