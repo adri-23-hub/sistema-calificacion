@@ -162,10 +162,8 @@ async function main() {
       status: EditionStatus.ACTIVE,
       scoringRule: "MEAN",
       quorum: 1.0,
-      publicLiveVisibility: "HIDDEN", // "sobre cerrado" por defecto
       decimals: 2,
       autoDisqualify: false,
-      resultsRevealed: false,
       startsAt: new Date("2026-11-13T08:00:00-04:00"), // viernes 13 nov
       endsAt: new Date("2026-11-16T23:59:59-04:00"),   // lunes 16 nov
     },

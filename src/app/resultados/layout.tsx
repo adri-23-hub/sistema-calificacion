@@ -11,9 +11,15 @@ export default function ResultadosLayout({
       <div className="bg-slate-900 border-b border-slate-800 py-2 px-4 sm:px-8">
         <div className="max-w-7xl mx-auto flex flex-wrap gap-2 justify-between items-center text-xs">
           <span className="text-slate-400 font-medium">
-            PORTAL OFICIAL DE RESULTADOS &nbsp;|&nbsp; XIII ENTRADA FOLKLÓRICA NACIONAL • TRINIDAD 2026
+            PORTAL PÚBLICO DE RESULTADOS EN VIVO &nbsp;|&nbsp; XIII ENTRADA FOLKLÓRICA NACIONAL • TRINIDAD 2026
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <Link
+              href="/vivo"
+              className="text-rose-300 hover:text-rose-200 font-semibold text-xs"
+            >
+              Pantalla de Auditorio →
+            </Link>
             <Link
               href="/login"
               className="text-amber-400 hover:text-amber-300 font-semibold text-xs"
@@ -34,10 +40,16 @@ export default function ResultadosLayout({
           </Link>
           <div className="flex items-center gap-3">
             <Link
+              href="/vivo"
+              className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500/10 text-rose-300 border border-rose-500/20"
+            >
+              📺 Pantalla en Vivo
+            </Link>
+            <Link
               href="/resultados"
               className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20"
             >
-              Resultados Oficiales
+              Resultados en Vivo
             </Link>
           </div>
         </div>

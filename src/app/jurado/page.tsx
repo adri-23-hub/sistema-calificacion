@@ -1,739 +1,380 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import JuryDancesClient, { type DanceItem } from "@/features/voting/components/JuryDancesClient";
 
 export const dynamic = "force-dynamic";
 
-// Seed fallback data matching the 36 dances in seed.ts & 02-lista-danzas.html
-const FALLBACK_DANCES: DanceItem[] = [
-  // Moperita (18 danzas)
-  {
-    id: "mop-01",
-    order: 1,
-    status: "CLOSED",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Los Macheteros de San Ignacio de Moxos",
-    fraternityName: "Fraternidad Folklórica Universitaria UAB • Sede Central Trinidad",
-    university: "UAB",
-    city: "Trinidad",
-    department: "Beni",
-    candidateName: "Valeria Rivero Cuéllar",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBOPMlR0YCFYCxV0Q2MeWwDv1FlL0lkgxPtVxLhj19hj8gODVmgCimwIlgMWjZpzznL_Y33oXZkjEXavwIw_nCFbNY_FL-Rmd_fWc9VWiu9MYntKNP8QDKJxoFr4BRE1v5OKdmw8Bg9RY-XorYFVW1yAgRF6R4Hp83yBc5mGgSFMatXlSy4Pim_4BAYWf5uE0dBDwp8Eq9naNoffkVKLIrlQdLXqUMAokAgaSOQ2HNHnormqXmR32Cn",
-    score: {
-      rawTotal: 38.5,
-      payloadHash: "0x8f9ca44a2b1e7c9f8d3e2a1b0c4f5e6d7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d",
-      submittedAt: new Date().toISOString(),
-    },
-  },
-  {
-    id: "mop-02",
-    order: 2,
-    status: "CLOSED",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Taquirari y Chovena Chiquitana",
-    fraternityName: "Ballet Folklórico Universitario UAGRM • Santa Cruz",
-    university: "UAGRM",
-    city: "Santa Cruz",
-    department: "Santa Cruz",
-    candidateName: "Luciana Aguilera Paz",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuA1YPKcnEFNguSLmmIHimTunbF6dZa60k9BxxW8qCwhW5s6GeBfH5LvZAVLMqMijJTJDxUT2Bj6N9909WQXPusaOtsfdDNDNEXdv0oMubVkXvQVrR3uiPTSUFMhNM1ac3j9w8Sl1smVKk95XAW84IuyCPem3vZhTWdE2HodRFOoeONQhd1L8zrfT3jvbxjWUD9PdT4pTGESGoB67OqEDNsGrfeixbEp5mVfTAxssaHZDOcTNjG6gvHz",
-    score: {
-      rawTotal: 37.0,
-      payloadHash: "0x4b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c",
-      submittedAt: new Date().toISOString(),
-    },
-  },
-  {
-    id: "mop-03",
-    order: 3,
-    status: "ACTIVE",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Danza del Sol y la Luna (Sirionó)",
-    fraternityName: "Fraternidad Étnica Amazónica • UNIVALLE",
-    university: "UNIVALLE",
-    city: "Trinidad",
-    department: "Beni",
-    candidateName: "Ariadna Melgar Saucedo",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuD6bgPzFm0eHyq5kPxQRZmDiO_PRFMQ-Hly9dx3PqgxXIRXn1FaS2bl0MJpxyC68z9gf1OS36t9BiFxtFxEMfA2QrvRnMd3fAuqjK9OnLiNcgydX91rlLi1ArUEQktJF5ly0PuEZYBjCkw7f3XylGudYLkDviP2JOA11qOvcCIBYEZW8JPZrVfJISxkqMWfW4YpDv6E6polpf3W7MXxD72q-quvyO1m0bPubOMg6RdEvmcmwYQvgsXG5BHLdugWcUoFmoCrhE4CLX0",
-    score: null,
-  },
-  {
-    id: "mop-04",
-    order: 4,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Los Toritos de San Borja",
-    fraternityName: "Ballet Estable Universitario UAB • Sede San Borja",
-    university: "UAB",
-    city: "San Borja",
-    department: "Beni",
-    candidateName: "Mariana Justiniano Pinto",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-05",
-    order: 5,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "El Sarao y Danza de las Cintas",
-    fraternityName: "Fraternidad Tradición Guaraní • UAJMS",
-    university: "UAJMS",
-    city: "Yacuiba",
-    department: "Tarija",
-    candidateName: "Paola Andrea Vacaflor",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-06",
-    order: 6,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Arete Guasu del Chaco",
-    fraternityName: "Conjunto Folklórico Chaqueño UAGRM • Camiri",
-    university: "UAGRM",
-    city: "Camiri",
-    department: "Santa Cruz",
-    candidateName: "Sara Noemí Cuéllar",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-07",
-    order: 7,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Carnavalito Cruceño de Antaño",
-    fraternityName: "Fraternidad Camba Universitaria • NUR",
-    university: "NUR",
-    city: "Santa Cruz",
-    department: "Santa Cruz",
-    candidateName: "Daniela Roca Banegas",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-08",
-    order: 8,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Los Judíos de San Lorenzo de Moxos",
-    fraternityName: "Ballet Autóctono Moxeño • UAB",
-    university: "UAB",
-    city: "San Ignacio",
-    department: "Beni",
-    candidateName: "Fernanda Salvatierra",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-09",
-    order: 9,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Rueda Chapaca de San Roque",
-    fraternityName: "Ballet Folklórico UAJMS • Central Tarija",
-    university: "UAJMS",
-    city: "Tarija",
-    department: "Tarija",
-    candidateName: "Camila Belén Torrez",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-10",
-    order: 10,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Danza del Ciervo (Moxos)",
-    fraternityName: "Fraternidad Ancestral Beni • UNIBOL",
-    university: "UNIBOL",
-    city: "Chimoré",
-    department: "Cochabamba",
-    candidateName: "Carla Jimena Añez",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-11",
-    order: 11,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Chovena de Concepción",
-    fraternityName: "Fraternidad Chiquitana UTEPSA",
-    university: "UTEPSA",
-    city: "Santa Cruz",
-    department: "Santa Cruz",
-    candidateName: "Gabriela Moreno Paz",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-12",
-    order: 12,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "El Tiluchi de Guayaramerín",
-    fraternityName: "Delegación Universitaria Norte UAB",
-    university: "UAB",
-    city: "Guayaramerín",
-    department: "Beni",
-    candidateName: "Vanessa Chávez Ortiz",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-13",
-    order: 13,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Atico Guarayo",
-    fraternityName: "Ballet Indígena Guarayo UAGRM",
-    university: "UAGRM",
-    city: "Ascensión de Guarayos",
-    department: "Santa Cruz",
-    candidateName: "Natalia Montero Suárez",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-14",
-    order: 14,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Danza de los Bábaros (Reyes)",
-    fraternityName: "Fraternidad Folklórica Rurre UAB",
-    university: "UAB",
-    city: "Rurrenabaque",
-    department: "Beni",
-    candidateName: "Andrea Vaca Diez",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-15",
-    order: 15,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Cueca Chapaca Tradicional",
-    fraternityName: "Centro Cultural Universitario San Bernardo",
-    university: "UAJMS",
-    city: "Tarija",
-    department: "Tarija",
-    candidateName: "Sofía Rengel Ramos",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-16",
-    order: 16,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "El Brincao Tradicional",
-    fraternityName: "Fraternidad Juvenil Universitaria UPSA",
-    university: "UPSA",
-    city: "Santa Cruz",
-    department: "Santa Cruz",
-    candidateName: "Lucía Mercado Landívar",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-17",
-    order: 17,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Los Chunchos de Tarija",
-    fraternityName: "Promesantes Universitarios San Roque",
-    university: "UAJMS",
-    city: "Tarija",
-    department: "Tarija",
-    candidateName: "Elena Farfán Castillo",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "mop-18",
-    order: 18,
-    status: "PENDING",
-    categoryName: "Moperita de Bolivia",
-    categorySlug: "moperita",
-    danceName: "Danza del Pescador Fluvial",
-    fraternityName: "Ballet Ribereño Amazónico UAB",
-    university: "UAB",
-    city: "Riberalta",
-    department: "Beni",
-    candidateName: "Flavia Parada Hurtado",
-    candidateTitle: "Candidata a Moperita 2026",
-    photoUrl: null,
-    score: null,
-  },
-
-  // Ñusta (18 danzas)
-  {
-    id: "nus-01",
-    order: 19,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Caporales Centralistas Universitarios",
-    fraternityName: "Fraternidad Caporales San Simón • Cochabamba",
-    university: "UMSS",
-    city: "Cochabamba",
-    department: "Cochabamba",
-    candidateName: "Valeria Méndez Flores",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: "https://lh3.googleusercontent.com/aida-public/AB6AXuBfhovqeJ0_fpEHOT9dmZm97GhiEXTfhKnVtTQOKbxU-tnWt7rLd5XwxpXcrzw3qAeGp1rsRA95TKU_i-V71xVwEE-Pmqpxo2FlgaG2Z-XeFDz6K-jSmdpqLIbcDwahS77hgLGQumN11OVWsuITaKjjhuCotjUY2Lr2jifviaJ7JF9Og5LGC_IFjBx49_aPZAQ0Q_FKiCd0h6nnmUY-LPpmKObUGHfskpV7Vcyn3jybQvYeFk4QpUew",
-    score: null,
-  },
-  {
-    id: "nus-02",
-    order: 20,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Morenada Central Universitaria",
-    fraternityName: "Fraternidad Morenada San Andrés • La Paz",
-    university: "UMSA",
-    city: "La Paz",
-    department: "La Paz",
-    candidateName: "Paola Andrea Quispe Mamani",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-03",
-    order: 21,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Diablada Ferroviaria Universitaria",
-    fraternityName: "Conjunto Tradicional Diablada Oruro • UTO",
-    university: "UTO",
-    city: "Oruro",
-    department: "Oruro",
-    candidateName: "Estefanía Choque Terrazas",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-04",
-    order: 22,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Tinku Chayantaka San Simón",
-    fraternityName: "Fraternidad Cultural Tinkus UMSS",
-    university: "UMSS",
-    city: "Cochabamba",
-    department: "Cochabamba",
-    candidateName: "Adriana Morales Flores",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-05",
-    order: 23,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Kullawada Antigua UMSA",
-    fraternityName: "Centro Cultural Kullawada San Andrés",
-    university: "UMSA",
-    city: "La Paz",
-    department: "La Paz",
-    candidateName: "Silvia Calle Huanca",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-06",
-    order: 24,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Pujllay Tarabuco Universitario",
-    fraternityName: "Fraternidad Pujllay San Francisco Xavier",
-    university: "USFX",
-    city: "Sucre",
-    department: "Chuquisaca",
-    candidateName: "María René Cárdenas",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-07",
-    order: 25,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Tobas Sud Jaguar UTO",
-    fraternityName: "Fraternidad Folklórica Tobas Central",
-    university: "UTO",
-    city: "Oruro",
-    department: "Oruro",
-    candidateName: "Jessica Alarcón Beltrán",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-08",
-    order: 26,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Llamerada San Andrés",
-    fraternityName: "Conjunto Folklórico Tradicional UMSA",
-    university: "UMSA",
-    city: "La Paz",
-    department: "La Paz",
-    candidateName: "Gabriela Condori Poma",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-09",
-    order: 27,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Waca Wacas Thanta Morenos",
-    fraternityName: "Fraternidad Waca Waca San Simón",
-    university: "UMSS",
-    city: "Cochabamba",
-    department: "Cochabamba",
-    candidateName: "Brenda Laura Gutiérrez",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-10",
-    order: 28,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Potolos de Betanzos UATF",
-    fraternityName: "Fraternidad Potolos Tomás Frías",
-    university: "UATF",
-    city: "Potosí",
-    department: "Potosí",
-    candidateName: "Erika Soto Meneses",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-11",
-    order: 29,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Salay Bolivia Cochabamba",
-    fraternityName: "Fraternidad Artística Salay San Simón",
-    university: "UMSS",
-    city: "Cochabamba",
-    department: "Cochabamba",
-    candidateName: "Melany Rocha Claros",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-12",
-    order: 30,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Doctorcitos Tradicionales UMSA",
-    fraternityName: "Centro Social y Cultural Doctorcitos",
-    university: "UMSA",
-    city: "La Paz",
-    department: "La Paz",
-    candidateName: "Romina Vargas Silva",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-13",
-    order: 31,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Incas Kollasuyo UTO",
-    fraternityName: "Fraternidad Folklórica Incas del Tawantinsuyo",
-    university: "UTO",
-    city: "Oruro",
-    department: "Oruro",
-    candidateName: "Leticia Ramos Medina",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-14",
-    order: 32,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Caporales Universitarios UPEA",
-    fraternityName: "Fraternidad Caporales El Alto",
-    university: "UPEA",
-    city: "El Alto",
-    department: "La Paz",
-    candidateName: "Maribel Yujra Ticona",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-15",
-    order: 33,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Morenada San Andrés Auténtica",
-    fraternityName: "Poderosa Morenada UMSA La Paz",
-    university: "UMSA",
-    city: "La Paz",
-    department: "La Paz",
-    candidateName: "Carla Jimena Mendoza",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-16",
-    order: 34,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Chicheños de Tupiza UATF",
-    fraternityName: "Conjunto Chicheño Tomás Frías",
-    university: "UATF",
-    city: "Tupiza",
-    department: "Potosí",
-    candidateName: "Valeria Guzmán Ortiz",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-17",
-    order: 35,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Tinku Universitario San Andrés",
-    fraternityName: "Tinkus Puros UMSA",
-    university: "UMSA",
-    city: "La Paz",
-    department: "La Paz",
-    candidateName: "Diana Tarqui Miranda",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-  {
-    id: "nus-18",
-    order: 36,
-    status: "PENDING",
-    categoryName: "Ñusta de Bolivia",
-    categorySlug: "nusta",
-    danceName: "Diablada San Simón Chuquisaca",
-    fraternityName: "Fraternidad Diablada USFX",
-    university: "USFX",
-    city: "Sucre",
-    department: "Chuquisaca",
-    candidateName: "Patricia Bernal Vera",
-    candidateTitle: "Candidata a Ñusta 2026",
-    photoUrl: null,
-    score: null,
-  },
-];
-
-export default async function JuradoPage() {
+export default async function JuradoMenuPage() {
   const session = await getSession();
   if (!session || session.role !== "JURADO") {
     redirect("/login");
   }
 
-  let dances: DanceItem[] = [];
+  // Estadísticas del jurado y estado del certamen en vivo
+  let evaluatedCount = 2;
+  let totalDancesCount = 36;
+  let activeEntryId = "mop-03";
+  let activeEntryName = "Ariadna Melgar Saucedo (UNIVALLE)";
+  let activeDanceTitle = "Danza del Sol y la Luna (Sirionó)";
 
   try {
-    // 1. Obtener grupos de danza (Módulo A)
-    const dbDanceGroups = await prisma.danceGroup.findMany({
-      include: {
-        fraternity: true,
-        danceScores: {
-          where: {
-            juryId: session.userId,
-            status: "SUBMITTED",
-          },
-        },
+    // 1. Contar evaluaciones del jurado
+    const scoredCount = await prisma.score.count({
+      where: {
+        juryId: session.userId,
+        status: "SUBMITTED",
       },
-      orderBy: [{ entryOrder: "asc" }],
     });
+    if (scoredCount > 0) evaluatedCount = scoredCount;
 
-    const danceGroupItems: DanceItem[] = dbDanceGroups.map((g) => ({
-      id: g.id,
-      order: g.entryOrder || 99,
-      status: g.status === "IN_SCORING" ? "ACTIVE" : (g.status as "PENDING" | "CLOSED"),
-      categoryName: "Entrada Folklórica",
-      categorySlug: "entrada-folklorica",
-      danceName: g.danceName,
-      fraternityName: g.fraternity.name,
-      university: g.fraternity.university,
-      city: g.fraternity.city,
-      department: g.fraternity.department,
-      candidateName: `Fraternidad Oficial (${g.numberOfDancers} bailarines)`,
-      candidateTitle: "Módulo A • Grupo de Danza",
-      photoUrl: null,
-      score: g.danceScores[0]
-        ? {
-            rawTotal: g.danceScores[0].rawTotal,
-            payloadHash: g.danceScores[0].payloadHash || "",
-            submittedAt: g.danceScores[0].submittedAt.toISOString(),
-          }
-        : null,
-    }));
+    // 2. Contar total de entradas
+    const totalEntries = await prisma.entry.count();
+    if (totalEntries > 0) totalDancesCount = totalEntries;
 
-    // 2. Obtener candidatas (Módulo B)
-    const entries = await prisma.entry.findMany({
+    // 3. Obtener danza o candidata actualmente en escenario
+    const liveEntry = await prisma.entry.findFirst({
+      where: { status: "IN_SCORING" },
       include: {
-        category: true,
         participant: {
           include: { fraternity: true },
         },
-        scores: {
-          where: {
-            juryId: session.userId,
-            status: "SUBMITTED",
-          },
-        },
+        category: true,
       },
-      orderBy: [
-        { category: { order: "asc" } },
-        { order: "asc" },
-      ],
+      orderBy: { order: "asc" },
     });
 
-    if (danceGroupItems.length > 0 || entries.length > 0) {
-      const candidateItems: DanceItem[] = entries.map((e) => {
-        const userScore = e.scores[0];
-        const fallback =
-          FALLBACK_DANCES.find(
-            (f) => f.order === e.order && f.categorySlug === e.category.slug
-          ) || FALLBACK_DANCES[(e.order - 1) % FALLBACK_DANCES.length];
-
-const FOLK_PHOTOS = [
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBOPMlR0YCFYCxV0Q2MeWwDv1FlL0lkgxPtVxLhj19hj8gODVmgCimwIlgMWjZpzznL_Y33oXZkjEXavwIw_nCFbNY_FL-Rmd_fWc9VWiu9MYntKNP8QDKJxoFr4BRE1v5OKdmw8Bg9RY-XorYFVW1yAgRF6R4Hp83yBc5mGgSFMatXlSy4Pim_4BAYWf5uE0dBDwp8Eq9naNoffkVKLIrlQdLXqUMAokAgaSOQ2HNHnormqXmR32Cn",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuA1YPKcnEFNguSLmmIHimTunbF6dZa60k9BxxW8qCwhW5s6GeBfH5LvZAVLMqMijJTJDxUT2Bj6N9909WQXPusaOtsfdDNDNEXdv0oMubVkXvQVrR3uiPTSUFMhNM1ac3j9w8Sl1smVKk95XAW84IuyCPem3vZhTWdE2HodRFOoeONQhd1L8zrfT3jvbxjWUD9PdT4pTGESGoB67OqEDNsGrfeixbEp5mVfTAxssaHZDOcTNjG6gvHz",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD6bgPzFm0eHyq5kPxQRZmDiO_PRFMQ-Hly9dx3PqgxXIRXn1FaS2bl0MJpxyC68z9gf1OS36t9BiFxtFxEMfA2QrvRnMd3fAuqjK9OnLiNcgydX91rlLi1ArUEQktJF5ly0PuEZYBjCkw7f3XylGudYLkDviP2JOA11qOvcCIBYEZW8JPZrVfJISxkqMWfW4YpDv6E6polpf3W7MXxD72q-quvyO1m0bPubOMg6RdEvmcmwYQvgsXG5BHLdugWcUoFmoCrhE4CLX0",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBfhovqeJ0_fpEHOT9dmZm97GhiEXTfhKnVtTQOKbxU-tnWt7rLd5XwxpXcrzw3qAeGp1rsRA95TKU_i-V71xVwEE-Pmqpxo2FlgaG2Z-XeFDz6K-jSmdpqLIbcDwahS77hgLGQumN11OVWsuITaKjjhuCotjUY2Lr2jifviaJ7JF9Og5LGC_IFjBx49_aPZAQ0Q_FKiCd0h6nnmUY-LPpmKObUGHfskpV7Vcyn3jybQvYeFk4QpUew",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCTmoUB-pJb9PAO2rduiM7b1i8e8LqKctE1yzjtDHpVYPTfzIvIVNI5U5LWSsr6kaerakcfe0aktjaileskm-Xa_VdE_wdOV-VPDpyVtGvtQ27ExUpommsroC6m_-JtpzBNDuO7qXiWvpgLadp9ebW1wL2SdZ6EXZGeRuWFw3lmjsypNUjuKj2r0S7Hbg-FlrTsBBOdeX_d7blbsXPI1H-OO16PxRe8DHrvbup_VonpPkUIHfyUYBaj",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBF6BEhWW-veH5u1jsArgO-OA0gIw6mz2nCinCcD22U_YzxBeVneB5ePZkfrCdvqMgi32LAxBIAzmHymh9to8bdO15MaYOLdkx4QaGjlEMF77Ms31Gta9VdBseovRKpAdrNpMjGvZaUVZgEsOASxgk2AWacInmap772wXyEIsNVX69c-aH-GvrMgsc7lv7azLvaicuye1uTJ1fQ9fwoGiUWV2wqYcK-_thGgJKThlFLPJL8C4DuUg8D",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDKn2sscK_EQmyJjoNUjlxLgtvqyDj_5qvl_c4LfwmZam4c06jrXTctPDFJyE52nDzWnhz_S-zv-ftpYmSOEmfs1wTOEpGLEKyo2PyQl_0ExcaXI6e80a37IVa7P955UQxIzaXDy617SUXplBKiDKR974Q7WCcY1gdenachkMZHJllts7nemBYhIBUgt8YTWsRA-7NI9ZstewNK92gK1eLPNGb_0YU8oaCASDvtZY9OoqRd83ds7Yb7X_TKgGCZBmpc0OGJ8hk57xw",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCIl0PEuAp-hgCXV03wVU0-rwZ1m0Jn46sdsZ7keTEdAPCgjxS6vPSTetZNJXTMerHTluPoj_8MytiRgsHOqVK_1cMMSfsUj0RGpvmugmMkxQOwCeb36Ti8fPox1HCiYJltGnw65kSO7jcYVm8OX7hq4Kks7_a8gUkOui30IefPE2br9jCSpHpguIUjibuyVrH4dJoigCUbzr2ubFk4n81Bokwle-OWq0ScxDRRQpF1nLssnd3E2YgcliUB4B8a_T6wTCRSS8kyaPw",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCFMxss_jp1Inxrj8gIvbh0JWoVMNjOGHAdawj14bozUsl1xIvFNRmlI1hl1hfjNDyr8CZmFaENICvpoxHV6x6PjZ6-rsPb8Yp6I_V-1aiuSGh4yaCBkoRSxlUeNXZxTL9CKbPOEI7iHo9SIWzL-LCMSnOaft7zw9KUXe5pKAeBjmqphcLsT5ghyln7hgCr4SCpzEyehOF_sjhLJyGUio4dUJWLnGx73-Ve5VQD-LpcB00kG567speegZzFdnEW7aKl0IlVRtJUlIY",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDymZxa29C5SmE-xm3lHr_EIfydi38S0qvrd7o2u-Wyzr7iYFrrgiddC8opuZkRdUuZO2DlL_YMnO3RZ3PPtmmkEpJ5LtDGZC-CiAKRXIHkB87RS-TGzikIPWTe2WhXupyrVK5M_hTtfheH5j5Kzr2vMOzRtbe7dCeoYGZgs74W6ZndhPxD-mtdPZioy0569lRYSO9HNgjTj3JaQeAjtkYqKCIIDiEaiKKAXi-_wW5Vqi8NEoGATp3cet5vU1ytRyQ7CaOIw2FmI_8",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD4AgxjTt235Ol5CQsYAySyoxADM8NJZ0AYFMB3C4SMVPfDOK_1HfvLG8NDcA4halMl15amsHT1ux0cdfx79ROORxVo3tx3tSmUexMcLl9jcECQyEMWcDoV4bujOtSjU5ZdPWFFZ8r1okr0IU-ZuZATnKknjSYzq0LfioPfdhGvu_Al1h1wxwLN9kC9mLCPiqns4GVYyb7cke2UoF5weC6QUIA_eY_grYKxS5Zvn703ph22yjeZ2CIZ",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCtDiEDyF0hMEgEM4jaQxMy0L-VY0gyt2B_HZ-H-uqj5rCxmQ_JGcS9HcuBpM1j8AjAv5FmU_vzqivr8q7K1jRbePRz-TkD6UWTOIeADA-nkSxlPuOBcDqKtueup2eESruI4WMxOjEbU1FKsfbKaMDD1Ic_Zpd70d-HI6e2-NLQwVJRX0o_kYPqJTBSQR0dkOEWVmidmOEb40nd3zXF-OkhJ8BILaFMXqyriBlQpLwnSK0R7u1V7PT1",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuB9spQw6tW_sm2PgvjD24nXJ78tmbm76ItjtKSErTFq3VzR7lst57jpaHydLgHpmDSs3aK_E4FZrSJXcHM1HUDcLhKF6FljHo7rCI1HdthYE6bJWUo00_Ni2WIVfHtXjdzJZaOUwNgIM66tCVOFuh-BBCvwakqo5kIy7iuBc8nv7Wd9Ld2T-qr8SfQBj6nOC7H3OrY5KXKhcM8xF0Ldk6u24e8__oVXEwWYHFCv0E4eSPrRJ5cfsRIe",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAo3eyvzj6gb72DaKDp7kucqvtG8Z7sDYRuXK5LFBOt6TWe0gmxW7gEeL5JLs11x6OnUmzZnrVLvxJastrTBquoUgoMQIXT0cXrIeJQ_hj7lATqzMa4w0ebQLoAE_WI3Z2jrzc-sMtwAGR8BHlTe-hhw7T6btXVRFjdc1Gb0QuStBUNN6Zh-1nUTIlD5mZz7oB4LZ9tLn-R5UpbMHV-7TaDH1lKf1GLoDw4vuI8QQH9Nctcam3Vg8ny3fu6vxuPH5HFX-xCR7CkChg"
-];
-
-        const assignedPhoto =
-          e.participant.photoUrl ||
-          fallback?.photoUrl ||
-          FOLK_PHOTOS[(e.order - 1) % FOLK_PHOTOS.length];
-
-        return {
-          id: e.id,
-          order: e.order,
-          status: e.status === "IN_SCORING" ? "ACTIVE" : (e.status as "PENDING" | "CLOSED"),
-          categoryName: e.category.name,
-          categorySlug: e.category.slug,
-          danceName:
-            e.participant.bio ||
-            fallback?.danceName ||
-            e.participant.fraternity.name,
-          fraternityName: e.participant.fraternity.name,
-          university: e.participant.fraternity.university,
-          city: e.participant.fraternity.city,
-          department: e.participant.fraternity.department,
-          candidateName: e.participant.fullName || fallback?.candidateName,
-          candidateTitle: `Candidata a ${e.category.name} 2026`,
-          photoUrl: assignedPhoto,
-          score: userScore
-            ? {
-                rawTotal: userScore.rawTotal || 0,
-                payloadHash: userScore.payloadHash || "",
-                submittedAt: userScore.submittedAt?.toISOString() || "",
-              }
-            : null,
-        };
-      });
-      dances = [...danceGroupItems, ...candidateItems];
-    } else {
-      dances = FALLBACK_DANCES;
+    if (liveEntry) {
+      activeEntryId = liveEntry.id;
+      activeEntryName = `${liveEntry.participant.fullName} (${liveEntry.participant.fraternity.university || liveEntry.category.name})`;
+      activeDanceTitle = liveEntry.participant.fraternity.name;
     }
   } catch (error) {
-    console.warn("Could not query DB directly, using seed catalog:", error);
-    dances = FALLBACK_DANCES;
+    console.warn("DB query failed in JuradoMenuPage, using fallback data:", error);
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <JuryDancesClient
-        juryName={session.name}
-        juryCode={session.code || "JUR-04"}
-        dances={dances}
-      />
+    <div className="max-w-[1400px] mx-auto py-2 sm:py-6 px-2 sm:px-4">
+      {/* Telemetry & Welcome Header */}
+      <header className="mb-8">
+        <div className="relative overflow-hidden p-5 sm:p-7 rounded-3xl bg-[#0a2e1d]/60 border border-white/10 backdrop-blur-2xl shadow-2xl">
+          {/* Top Gold Gradient Line */}
+          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-secondary-container via-tertiary to-emerald" />
+
+          {/* Ambient Glows */}
+          <div className="absolute -top-20 -right-20 w-72 h-72 bg-tertiary/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute -bottom-20 -left-20 w-72 h-72 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+            {/* Identity */}
+            <div className="flex items-center gap-4">
+              <div className="relative flex-shrink-0">
+                <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-tertiary via-tertiary-fixed-dim to-secondary flex items-center justify-center p-0.5 shadow-xl">
+                  <div className="w-full h-full bg-[#001208] rounded-[14px] flex items-center justify-center">
+                    <span
+                      className="ms text-tertiary text-3xl"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
+                      how_to_reg
+                    </span>
+                  </div>
+                </div>
+                <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald flex items-center justify-center ring-2 ring-[#0a2e1d]">
+                  <span className="ms text-[#001208] text-[12px] font-black">check</span>
+                </span>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-tertiary bg-tertiary/10 border border-tertiary/30 px-2.5 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse" />
+                    Mesa Oficial de Jurado
+                  </span>
+                  <span className="text-xs text-on-surface-variant flex items-center gap-1.5 font-medium">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald" />
+                    </span>
+                    Terminal Conectada &bull; Sincronización en Vivo
+                  </span>
+                </div>
+
+                <h1 className="font-display font-extrabold text-2xl sm:text-3xl text-[#f4fbf6] tracking-tight">
+                  Bienvenido, {session.name}
+                </h1>
+                <p className="text-xs sm:text-sm text-on-surface-variant mt-0.5">
+                  Credencial Oficial: <strong className="text-tertiary">{session.code || "JUR-01"}</strong> &nbsp;|&nbsp; XIII Entrada Folklórica Universitaria Nacional &bull; Trinidad - Beni
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Live Stats Counters */}
+            <div className="flex flex-wrap items-center gap-3">
+              {/* Stat 1: Evaluated */}
+              <div className="flex items-center gap-3 bg-[#001208]/80 px-4 py-2.5 rounded-2xl border border-white/5 shadow-inner">
+                <span className="ms text-tertiary text-2xl">fact_check</span>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-on-surface-variant block leading-tight">
+                    Calificadas
+                  </span>
+                  <span className="font-display font-extrabold text-lg text-[#f4fbf6]">
+                    {evaluatedCount} <span className="text-xs text-on-surface-variant font-normal">/ {totalDancesCount}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Stat 2: Active on stage */}
+              <div className="flex items-center gap-3 bg-[#001208]/80 px-4 py-2.5 rounded-2xl border border-white/5 shadow-inner">
+                <span className="ms text-secondary text-2xl animate-pulse">broadcast_on_personal</span>
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-on-surface-variant block leading-tight">
+                    En Escenario
+                  </span>
+                  <span className="font-display font-bold text-xs sm:text-sm text-secondary truncate max-w-[180px] block" title={activeEntryName}>
+                    {activeEntryName}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Section: Votación del Jurado (4 pantallas) */}
+      <section className="mb-12">
+        {/* Section Header matching prototype */}
+        <div className="flex items-center gap-3 mb-6">
+          <span className="ms text-[32px] text-[#f5bf00]" style={{ fontVariationSettings: "'FILL' 1" }}>
+            how_to_reg
+          </span>
+          <h2 className="font-display text-[22px] sm:text-[24px] font-bold tracking-[0.02em] text-[#f4fbf6]">
+            Votación del Jurado
+          </h2>
+          <span className="text-[12px] text-on-surface-variant border border-white/15 rounded-full px-3 py-0.5 font-medium">
+            4 pantallas
+          </span>
+          <div className="flex-1 h-[1px] bg-gradient-to-r from-[#f5bf00]/45 to-transparent ml-2" />
+        </div>
+
+        {/* 4 Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[18px]">
+          {/* Card 01: Mi Credencial y Mesa */}
+          <Link
+            href="/jurado/credencial"
+            className="group relative flex flex-col gap-3 bg-[#0a2e1d]/65 backdrop-blur-xl border border-white/10 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#f5bf00]/50 hover:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)] focus-visible:outline-2 focus-visible:outline-[#f5bf00] overflow-hidden"
+          >
+            {/* Top gold bar */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#f5bf00] to-transparent opacity-70" />
+
+            <div className="flex justify-between items-start">
+              <span className="font-display font-extrabold text-[15px] text-[#f5bf00] tracking-[0.1em]">
+                01
+              </span>
+              <span className="ms text-[30px] text-[#f5bf00]">
+                badge
+              </span>
+            </div>
+
+            <h3 className="font-display text-[18px] font-bold text-[#f4fbf6] leading-[1.32]">
+              Mi Credencial y Mesa
+            </h3>
+
+            <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
+              Acceso oficial con credencial cifrada, código QR y PIN asignado para su mesa.
+            </p>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 font-display font-bold text-[13px] text-[#f5bf00] tracking-[0.03em] group-hover:translate-x-1 transition-transform">
+                Ver credencial <span className="ms text-[17px]">arrow_forward</span>
+              </span>
+            </div>
+          </Link>
+
+          {/* Card 02: Lista de Danzas y Candidatas */}
+          <Link
+            href="/jurado/danzas"
+            className="group relative flex flex-col gap-3 bg-[#0a2e1d]/65 backdrop-blur-xl border border-white/10 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#f5bf00]/50 hover:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)] focus-visible:outline-2 focus-visible:outline-[#f5bf00] overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#f5bf00] to-transparent opacity-70" />
+
+            <div className="flex justify-between items-start">
+              <span className="font-display font-extrabold text-[15px] text-[#f5bf00] tracking-[0.1em]">
+                02
+              </span>
+              <span className="ms text-[30px] text-[#f5bf00]">
+                format_list_bulleted
+              </span>
+            </div>
+
+            <h3 className="font-display text-[18px] font-bold text-[#f4fbf6] leading-[1.32]">
+              Lista de Danzas y Candidatas
+            </h3>
+
+            <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
+              Fraternidades y candidatas del certamen con su estado de calificación en vivo.
+            </p>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 font-display font-bold text-[13px] text-[#f5bf00] tracking-[0.03em] group-hover:translate-x-1 transition-transform">
+                Ver programa completo <span className="ms text-[17px]">arrow_forward</span>
+              </span>
+            </div>
+          </Link>
+
+          {/* Card 03: Emitir Voto en Vivo */}
+          <Link
+            href={`/jurado/calificar/${activeEntryId}`}
+            className="group relative flex flex-col gap-3 bg-[#0a2e1d]/80 backdrop-blur-xl border border-tertiary/40 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#f5bf00] hover:shadow-[0_20px_45px_-15px_rgba(245,191,0,0.3)] focus-visible:outline-2 focus-visible:outline-[#f5bf00] overflow-hidden ring-1 ring-tertiary/20"
+          >
+            {/* Top gold bar with pulse */}
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#f5bf00] via-[#ffdf94] to-transparent" />
+
+            <div className="flex justify-between items-start">
+              <span className="font-display font-extrabold text-[15px] text-[#f5bf00] tracking-[0.1em]">
+                03
+              </span>
+              <span className="ms text-[32px] text-[#f5bf00]" style={{ fontVariationSettings: "'FILL' 1" }}>
+                how_to_vote
+              </span>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-display text-[19px] font-extrabold text-[#f4fbf6] leading-[1.32] group-hover:text-tertiary transition-colors">
+                  Emitir Voto en Vivo
+                </h3>
+              </div>
+              {/* Badge indicando danza actual en escenario */}
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-emerald px-2.5 py-0.5 rounded-full bg-emerald/15 border border-emerald/40 w-fit">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald animate-ping" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald -ml-3" />
+                En Escenario: {activeDanceTitle.slice(0, 24)}...
+              </span>
+            </div>
+
+            <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
+              Puntaje táctil por los 4 criterios oficiales (40 pts máx.) con confirmación cifrada.
+            </p>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-tertiary text-on-tertiary font-display font-extrabold text-[13px] tracking-[0.03em] shadow-md group-hover:brightness-110 group-hover:translate-x-1 transition-all">
+                Votar Ahora <span className="ms text-[17px]">arrow_forward</span>
+              </span>
+            </div>
+          </Link>
+
+          {/* Card 04: Mis Votos Emitidos */}
+          <Link
+            href="/jurado/mis-calificaciones"
+            className="group relative flex flex-col gap-3 bg-[#0a2e1d]/65 backdrop-blur-xl border border-white/10 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#f5bf00]/50 hover:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)] focus-visible:outline-2 focus-visible:outline-[#f5bf00] overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#f5bf00] to-transparent opacity-70" />
+
+            <div className="flex justify-between items-start">
+              <span className="font-display font-extrabold text-[15px] text-[#f5bf00] tracking-[0.1em]">
+                04
+              </span>
+              <span className="ms text-[30px] text-[#f5bf00]">
+                fact_check
+              </span>
+            </div>
+
+            <h3 className="font-display text-[18px] font-bold text-[#f4fbf6] leading-[1.32]">
+              Mis Votos Emitidos
+            </h3>
+
+            <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
+              Dashboard de progreso del jurado: danzas calificadas, pendientes y recibos cifrados.
+            </p>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 font-display font-bold text-[13px] text-[#f5bf00] tracking-[0.03em] group-hover:translate-x-1 transition-transform">
+                Ver mis calificaciones <span className="ms text-[17px]">arrow_forward</span>
+              </span>
+            </div>
+          </Link>
+        </div>
+      </section>
+
+      {/* Secondary Section: Resultados en Vivo para el Público (2 pantallas) */}
+      <section className="mb-8">
+        <div className="flex items-center gap-3 mb-6">
+          <span className="ms text-[30px] text-[#5aa9ff]">
+            cast
+          </span>
+          <h2 className="font-display text-[20px] sm:text-[22px] font-bold tracking-[0.02em] text-[#f4fbf6]">
+            Resultados en Vivo para el Público
+          </h2>
+          <span className="text-[12px] text-on-surface-variant border border-white/15 rounded-full px-3 py-0.5 font-medium">
+            2 pantallas
+          </span>
+          <div className="flex-1 h-[1px] bg-gradient-to-r from-[#5aa9ff]/45 to-transparent ml-2" />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px]">
+          {/* Card 05: Pantalla Auditorio */}
+          <Link
+            href="/resultados"
+            className="group relative flex flex-col gap-3 bg-[#0a2e1d]/50 backdrop-blur-xl border border-white/10 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#5aa9ff]/50 hover:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)] focus-visible:outline-2 focus-visible:outline-[#5aa9ff] overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#5aa9ff] to-transparent opacity-70" />
+
+            <div className="flex justify-between items-start">
+              <span className="font-display font-extrabold text-[15px] text-[#5aa9ff] tracking-[0.1em]">
+                05
+              </span>
+              <span className="ms text-[30px] text-[#5aa9ff]">
+                cast
+              </span>
+            </div>
+
+            <h3 className="font-display text-[18px] font-bold text-[#f4fbf6] leading-[1.32]">
+              Pantalla Auditorio (Tiempo Real)
+            </h3>
+
+            <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
+              Proyección gigante en vivo para el escenario: tabla de posiciones y podio en tiempo real.
+            </p>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 font-display font-bold text-[13px] text-[#5aa9ff] tracking-[0.03em] group-hover:translate-x-1 transition-transform">
+                Ver pantalla <span className="ms text-[17px]">arrow_forward</span>
+              </span>
+            </div>
+          </Link>
+
+          {/* Card 06: Resultados Finales y Podio */}
+          <Link
+            href="/resultados"
+            className="group relative flex flex-col gap-3 bg-[#0a2e1d]/50 backdrop-blur-xl border border-white/10 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#5aa9ff]/50 hover:shadow-[0_18px_40px_-18px_rgba(0,0,0,0.8)] focus-visible:outline-2 focus-visible:outline-[#5aa9ff] overflow-hidden"
+          >
+            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-[#5aa9ff] to-transparent opacity-70" />
+
+            <div className="flex justify-between items-start">
+              <span className="font-display font-extrabold text-[15px] text-[#5aa9ff] tracking-[0.1em]">
+                06
+              </span>
+              <span className="ms text-[30px] text-[#5aa9ff]">
+                workspace_premium
+              </span>
+            </div>
+
+            <h3 className="font-display text-[18px] font-bold text-[#f4fbf6] leading-[1.32]">
+              Resultados Finales y Podio
+            </h3>
+
+            <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
+              Escrutinio oficial, podio de coronación, premios especiales y acta notariada.
+            </p>
+
+            <div className="pt-2">
+              <span className="inline-flex items-center gap-1.5 font-display font-bold text-[13px] text-[#5aa9ff] tracking-[0.03em] group-hover:translate-x-1 transition-transform">
+                Ver pantalla <span className="ms text-[17px]">arrow_forward</span>
+              </span>
+            </div>
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }

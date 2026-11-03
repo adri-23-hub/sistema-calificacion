@@ -1,11 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  hasPermission,
-  requirePermission,
-  canViewScoreValues,
-  canViewVotingStatus,
-  type Permission,
-} from "./rbac";
+import { hasPermission, requirePermission, canViewVotingStatus } from "./rbac";
 import { Role } from "@prisma/client";
 
 describe("Seguridad y Control de Acceso basado en Roles (RBAC)", () => {
@@ -25,8 +19,6 @@ describe("Seguridad y Control de Acceso basado en Roles (RBAC)", () => {
     it("CONTROL NO puede ver notas ni resultados", () => {
       expect(hasPermission(Role.CONTROL, "scores:read")).toBe(false);
       expect(hasPermission(Role.CONTROL, "results:read")).toBe(false);
-      expect(canViewScoreValues(Role.CONTROL, false)).toBe(false);
-      expect(canViewScoreValues(Role.CONTROL, true)).toBe(false);
     });
 
     it("CONTROL NO puede descalificar grupos (exclusivo de ADMIN)", () => {
@@ -52,19 +44,8 @@ describe("Seguridad y Control de Acceso basado en Roles (RBAC)", () => {
       expect(canViewVotingStatus(Role.NOTARIO)).toBe(true);
     });
 
-    it("NOTARIO NO puede ver las notas antes de la apertura oficial (modo sobre cerrado)", () => {
-      // resultsRevealed = false
-      expect(canViewScoreValues(Role.NOTARIO, false)).toBe(false);
-    });
-
-    it("NOTARIO puede ver las notas ÚNICAMENTE DESPUÉS de la apertura oficial", () => {
-      // resultsRevealed = true
-      expect(canViewScoreValues(Role.NOTARIO, true)).toBe(true);
-    });
-
-    it("NOTARIO tiene permiso de confirmar apertura oficial (confirm_notary)", () => {
-      expect(hasPermission(Role.NOTARIO, "opening:confirm_notary")).toBe(true);
-      expect(hasPermission(Role.NOTARIO, "opening:confirm_admin")).toBe(false);
+    it("NOTARIO puede consultar los resultados públicos agregados", () => {
+      expect(hasPermission(Role.NOTARIO, "results:read")).toBe(true);
     });
 
     it("NOTARIO NO puede votar ni modificar ningún dato", () => {
@@ -81,8 +62,6 @@ describe("Seguridad y Control de Acceso basado en Roles (RBAC)", () => {
       expect(hasPermission(Role.JURADO, "scores:create")).toBe(true);
       expect(hasPermission(Role.JURADO, "scores:read")).toBe(true);
       expect(hasPermission(Role.JURADO, "results:read")).toBe(false);
-      expect(canViewScoreValues(Role.JURADO, false)).toBe(false);
-      expect(canViewScoreValues(Role.JURADO, true)).toBe(false);
     });
 
     it("JURADO no puede anular votos ni registrar penalizaciones", () => {
@@ -92,20 +71,15 @@ describe("Seguridad y Control de Acceso basado en Roles (RBAC)", () => {
   });
 
   describe("Permisos de ADMIN (Comité Organizador)", () => {
-    it("ADMIN tiene facultades exclusivas: descalificar, anular votos, anular penalizaciones, apertura", () => {
+    it("ADMIN tiene facultades exclusivas: descalificar, anular votos, anular penalizaciones y configurar", () => {
       expect(hasPermission(Role.ADMIN, "groups:disqualify")).toBe(true);
       expect(hasPermission(Role.ADMIN, "scores:void")).toBe(true);
       expect(hasPermission(Role.ADMIN, "penalties:void")).toBe(true);
       expect(hasPermission(Role.ADMIN, "config:write")).toBe(true);
-      expect(hasPermission(Role.ADMIN, "opening:confirm_admin")).toBe(true);
     });
 
-    it("Modo sobre cerrado: incluso ADMIN no ve notas antes de la apertura oficial si resultsRevealed es false", () => {
-      expect(canViewScoreValues(Role.ADMIN, false)).toBe(false);
-    });
-
-    it("ADMIN ve las notas una vez revelados los resultados", () => {
-      expect(canViewScoreValues(Role.ADMIN, true)).toBe(true);
+    it("ADMIN puede consultar los resultados públicos agregados", () => {
+      expect(hasPermission(Role.ADMIN, "results:read")).toBe(true);
     });
   });
 });

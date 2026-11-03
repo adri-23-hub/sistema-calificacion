@@ -31,7 +31,7 @@ export interface DanceGroupResult {
   juryScores: number[];       // nota de cada jurado
   average: number;            // promedio (o promedio recortado)
   penaltyTotal: number;       // total de penalizaciones
-  finalScore: number;         // nota final = max(promedio − penalización, 0)
+  finalScore: number;         // nota final
   penaltyBreakdown: {
     fromYellow: number;       // floor(amarillas/3) × 5
     fromRed: number;          // rojas × 10
@@ -132,7 +132,8 @@ export function calculateTrimmedMean(scores: number[], decimals: number = 2): nu
 /**
  * Calcula la nota final de un grupo de danza.
  *
- * nota_final = max(promedio − penalización_total, 0)
+ * Si penaltyOrder === "BEFORE_AVERAGE": resta las penalizaciones de cada jurado antes de promediar.
+ * Si penaltyOrder === "AFTER_AVERAGE" (por defecto): calcula el promedio y resta las penalizaciones.
  */
 export function calculateDanceGroupFinalScore(
   juryScores: DanceJuryScore[],
@@ -142,6 +143,7 @@ export function calculateDanceGroupFinalScore(
     scoringRule?: "MEAN" | "TRIMMED_MEAN";
     decimals?: number;
     penaltyConfig?: { yellowThreshold?: number; yellowPenalty?: number; redPenalty?: number; orderPenalty?: number };
+    penaltyOrder?: "BEFORE_AVERAGE" | "AFTER_AVERAGE";
   } = {}
 ): DanceGroupResult {
   const {
@@ -149,22 +151,35 @@ export function calculateDanceGroupFinalScore(
     scoringRule = "MEAN",
     decimals = 2,
     penaltyConfig = {},
+    penaltyOrder = "AFTER_AVERAGE",
   } = options;
 
   // Calcular nota de cada jurado
   const juryTotals = juryScores.map((s) => calculateDanceJuryScore(s, weights, decimals));
 
-  // Calcular promedio
-  const average = scoringRule === "TRIMMED_MEAN"
-    ? calculateTrimmedMean(juryTotals, decimals)
-    : calculateMean(juryTotals, decimals);
-
   // Calcular penalizaciones
   const penaltyTotal = calculatePenaltyTotal(penalties, penaltyConfig);
   const penaltyBreakdown = calculatePenaltyBreakdown(penalties, penaltyConfig);
 
-  // Nota final: max(promedio - penalización, 0)
-  const finalScore = roundTo(Math.max(average - penaltyTotal, 0), decimals);
+  let average: number;
+  let finalScore: number;
+
+  if (penaltyOrder === "BEFORE_AVERAGE") {
+    // Restar penalizaciones a la nota de cada jurado antes de promediar (acotando en 0)
+    const penalizedJuryTotals = juryTotals.map((tot) => roundTo(Math.max(tot - penaltyTotal, 0), decimals));
+    average = scoringRule === "TRIMMED_MEAN"
+      ? calculateTrimmedMean(juryTotals, decimals)
+      : calculateMean(juryTotals, decimals);
+    finalScore = scoringRule === "TRIMMED_MEAN"
+      ? calculateTrimmedMean(penalizedJuryTotals, decimals)
+      : calculateMean(penalizedJuryTotals, decimals);
+  } else {
+    // Orden estándar: calcular promedio de jurados y luego restar penalizaciones
+    average = scoringRule === "TRIMMED_MEAN"
+      ? calculateTrimmedMean(juryTotals, decimals)
+      : calculateMean(juryTotals, decimals);
+    finalScore = roundTo(Math.max(average - penaltyTotal, 0), decimals);
+  }
 
   return {
     juryScores: juryTotals,

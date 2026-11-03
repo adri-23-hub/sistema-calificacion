@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { loginJuryAction, loginAdminAction } from "@/features/auth/actions";
@@ -405,6 +406,24 @@ export default function LoginPage() {
               <p className="font-body-sm text-xs text-on-surface-variant leading-relaxed">
                 <strong className="text-on-surface">Acceso estrictamente reservado y protocolizado.</strong> Conforme al Reglamento Oficial de la XIII Entrada Folklórica Universitaria Nacional, cada registro de puntaje emitido es irrevocable, auditado y firmado con hash digital criptográfico.
               </p>
+            </div>
+
+            {/* Acceso público sin credenciales */}
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Link
+                href="/resultados"
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-container-high border border-tertiary/30 text-tertiary text-xs font-bold hover:bg-surface-container-highest transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">leaderboard</span>
+                Ver resultados en vivo
+              </Link>
+              <Link
+                href="/vivo"
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-surface-container-high border border-secondary/30 text-secondary text-xs font-bold hover:bg-surface-container-highest transition-colors"
+              >
+                <span className="material-symbols-outlined text-base">live_tv</span>
+                Pantalla de auditorio
+              </Link>
             </div>
 
             {/* Quick Jury Support Line */}

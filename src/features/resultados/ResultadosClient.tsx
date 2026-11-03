@@ -1,381 +1,492 @@
 "use client";
 
-import { useState } from "react";
-import { exportResultsToExcel } from "@/lib/export-excel";
 import Link from "next/link";
-
-export interface DanceResultItem {
-  puesto: number | string;
-  id: string;
-  entryOrder: number | null;
-  danceName: string;
-  fraternityName: string;
-  university: string;
-  department: string;
-  numberOfDancers: number;
-  average: number;
-  yellowFlags: number;
-  redFlags: number;
-  orderViolation: boolean;
-  manualDeductions: number;
-  penaltyTotal: number;
-  finalScore: number;
-  isDisqualified: boolean;
-  disqualifyReason?: string | null;
-}
-
-export interface CandidateResultItem {
-  puesto: number | string;
-  id: string;
-  fullName: string;
-  categoryName: string;
-  fraternityName: string;
-  university: string;
-  photoUrl: string | null;
-  galaScore: number;
-  casualScore: number;
-  tipicaScore: number;
-  totalScore: number;
-}
+import { useMemo, useState } from "react";
+import { exportResultsToExcel } from "@/lib/export-excel";
+import { useLiveResults } from "@/features/live/useLiveResults";
+import type {
+  LiveCandidateItem,
+  LiveDanceItem,
+  LiveResultsPayload,
+} from "@/features/live/types";
 
 interface ResultadosClientProps {
-  editionName: string;
-  year: number;
-  resultsRevealed: boolean;
-  adminConfirmedAt: string | null;
-  notaryConfirmedAt: string | null;
-  danceGroups: DanceResultItem[];
-  candidates: CandidateResultItem[];
+  initialData: LiveResultsPayload;
 }
 
-export default function ResultadosClient({
-  editionName,
-  year,
-  resultsRevealed,
-  adminConfirmedAt,
-  notaryConfirmedAt,
-  danceGroups,
-  candidates,
-}: ResultadosClientProps) {
-  const [activeTab, setActiveTab] = useState<"danzas" | "candidatas">("danzas");
+type ActiveTab = "danzas" | "candidatas";
+
+function formatScore(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleTimeString("es-BO", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone: "America/La_Paz",
+  });
+}
+
+function rankLabel(rank: number | null, feminine = false): string {
+  if (rank === 1) return feminine ? "👑 Ganadora" : "🥇 1.º";
+  if (rank === 2) return feminine ? "🥈 2.ª" : "🥈 2.º";
+  if (rank === 3) return feminine ? "🥉 3.ª" : "🥉 3.º";
+  if (rank) return feminine ? `${rank}.ª` : `${rank}.º`;
+  return "—";
+}
+
+function statusLabel(status: LiveDanceItem["status"]): string {
+  if (status === "IN_SCORING") return "En calificación";
+  if (status === "CLOSED") return "Cerrada";
+  if (status === "DISQUALIFIED") return "Descalificado";
+  return "Pendiente";
+}
+
+function itemName(item: LiveDanceItem | LiveCandidateItem): string {
+  return "danceName" in item ? item.danceName : item.fullName;
+}
+
+function itemScore(item: LiveDanceItem | LiveCandidateItem): number {
+  return "finalScore" in item ? item.finalScore : item.totalScore;
+}
+
+export default function ResultadosClient({ initialData }: ResultadosClientProps) {
+  const { data, error, isRefreshing } = useLiveResults(initialData);
+  const [activeTab, setActiveTab] = useState<ActiveTab>("danzas");
   const [search, setSearch] = useState("");
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(
+    () => initialData.moduleB.categories[0]?.id ?? null
+  );
+
+  const activeCategory = useMemo(
+    () =>
+      data.moduleB.categories.find((category) => category.id === activeCategoryId) ??
+      data.moduleB.categories[0] ??
+      null,
+    [activeCategoryId, data.moduleB.categories]
+  );
+
+  const danceGroups = data.moduleA.items;
+  const candidates = activeCategory?.items ?? [];
+
+  const filteredDance = danceGroups.filter((item) => {
+    const term = search.toLowerCase();
+    return (
+      item.danceName.toLowerCase().includes(term) ||
+      item.fraternityName.toLowerCase().includes(term) ||
+      item.university.toLowerCase().includes(term)
+    );
+  });
+
+  const filteredCandidates = candidates.filter((item) => {
+    const term = search.toLowerCase();
+    return (
+      item.fullName.toLowerCase().includes(term) ||
+      item.fraternityName.toLowerCase().includes(term) ||
+      item.university.toLowerCase().includes(term)
+    );
+  });
+
+  const podiumItems: Array<LiveDanceItem | LiveCandidateItem> =
+    activeTab === "danzas"
+      ? danceGroups.filter((item) => item.rank !== null && item.rank <= 3)
+      : candidates.filter((item) => item.rank !== null && item.rank <= 3);
 
   const handleExport = () => {
     exportResultsToExcel({
-      editionName,
-      danceGroups: danceGroups.map((d) => ({
-        puesto: d.puesto,
-        danza: d.danceName,
-        fraternidad: d.fraternityName,
-        universidad: d.university,
-        departamento: d.department,
-        promedioJurados: d.average,
-        amarillas: d.yellowFlags,
-        rojas: d.redFlags,
-        ordenIncumplido: d.orderViolation ? "SÍ" : "NO",
-        descuentosManuales: d.manualDeductions,
-        totalPenalizaciones: d.penaltyTotal,
-        notaFinal: d.finalScore,
-        estado: d.isDisqualified ? "DESCALIFICADO" : "VÁLIDO",
+      editionName: data.edition.name,
+      danceGroups: danceGroups.map((item) => ({
+        puesto: item.rank ?? (item.isDisqualified ? "DESCALIFICADO" : "—"),
+        danza: item.danceName,
+        fraternidad: item.fraternityName,
+        universidad: item.university,
+        departamento: item.department,
+        promedioJurados: item.average,
+        amarillas: item.yellowFlags,
+        rojas: item.redFlags,
+        ordenIncumplido: item.orderViolation ? "SÍ" : "NO",
+        descuentosManuales: item.manualDeductions,
+        totalPenalizaciones: item.penaltyTotal,
+        notaFinal: item.finalScore,
+        estado: item.isDisqualified
+          ? "DESCALIFICADO"
+          : statusLabel(item.status).toUpperCase(),
       })),
-      candidates: candidates.map((c) => ({
-        puesto: c.puesto,
-        candidata: c.fullName,
-        categoria: c.categoryName,
-        fraternidad: c.fraternityName,
-        pasarelaGala: c.galaScore,
-        pasarelaCasual: c.casualScore,
-        pasarelaTipica: c.tipicaScore,
-        notaFinal: c.totalScore,
-      })),
-      filename: `Resultados_Oficiales_${editionName.replace(/\s+/g, "_")}.xlsx`,
+      candidates: data.moduleB.categories.flatMap((category) =>
+        category.items.map((item) => ({
+          puesto: item.rank ?? "—",
+          candidata: item.fullName,
+          categoria: item.categoryName,
+          fraternidad: item.fraternityName,
+          pasarelaGala:
+            item.runways.find((runway) => runway.type === "GALA")?.average ?? 0,
+          pasarelaCasual:
+            item.runways.find((runway) => runway.type === "CASUAL")?.average ?? 0,
+          pasarelaTipica:
+            item.runways.find((runway) => runway.type === "TIPICA")?.average ?? 0,
+          notaFinal: item.totalScore,
+        }))
+      ),
+      filename: `Resultados_${data.edition.name.replace(/\s+/g, "_")}.xlsx`,
     });
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Filtrado
-  const filteredDance = danceGroups.filter(
-    (d) =>
-      d.danceName.toLowerCase().includes(search.toLowerCase()) ||
-      d.fraternityName.toLowerCase().includes(search.toLowerCase()) ||
-      d.university.toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-      {/* Header oficial */}
       <header className="text-center space-y-3">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
-          <span>🏛️</span>
-          <span>CONFEDERACIÓN UNIVERSITARIA BOLIVIANA • FUL UABJB</span>
+        <div className="inline-flex flex-wrap justify-center items-center gap-2">
+          <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
+            🏛️ CONFEDERACIÓN UNIVERSITARIA BOLIVIANA • FUL UABJB
+          </span>
+          <span className="px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-bold inline-flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500" />
+            </span>
+            EN VIVO
+          </span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-          Resultados Oficiales de la Entrada Folklórica
+          Resultados de la Entrada Folklórica
         </h1>
         <p className="text-sm text-slate-400 max-w-2xl mx-auto">
-          {editionName} • Trinidad, Beni • Calificación oficial y auditoría notarial.
+          {data.edition.name} {data.edition.year} • {data.edition.venue} • Calificación
+          oficial en tiempo real.
+        </p>
+        <p className="text-xs text-slate-500">
+          Actualizado a las {formatTime(data.updatedAt)}
+          {isRefreshing ? " · actualizando…" : ""} · Las posiciones pueden cambiar hasta el
+          cierre de la votación.
         </p>
       </header>
 
-      {/* Si NO se han revelado los resultados: Modo Sobre Cerrado */}
-      {!resultsRevealed && (
-        <div className="bg-slate-900 border border-amber-500/30 rounded-3xl p-8 sm:p-12 text-center max-w-2xl mx-auto shadow-2xl space-y-6">
-          <div className="w-20 h-20 bg-amber-500/10 border border-amber-500/30 rounded-full flex items-center justify-center mx-auto text-4xl">
-            🔒
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-white">
-              Votaciones en Modo "Sobre Cerrado"
-            </h2>
-            <p className="text-sm text-slate-400 mt-2 leading-relaxed">
-              Las calificaciones de los jurados se encuentran aseguradas en plicas digitales con cadena criptográfica.
-              Por estricto reglamento, las notas serán reveladas únicamente en el <strong>acto público de apertura oficial</strong> con la doble confirmación del Comité Organizador y el Notario de Fe Pública.
-            </p>
-          </div>
+      {error && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300">
+          ⚠️ {error} Se mantiene la última información disponible.
+        </div>
+      )}
 
-          <div className="grid grid-cols-2 gap-4 text-xs text-left bg-slate-950 p-4 rounded-2xl border border-slate-800">
-            <div>
-              <div className="text-slate-500 uppercase font-bold text-[10px]">Comité Organizador:</div>
-              <div className="text-white font-medium mt-0.5">
-                {adminConfirmedAt ? "✓ Confirmado" : "⏳ Pendiente"}
-              </div>
-            </div>
-            <div>
-              <div className="text-slate-500 uppercase font-bold text-[10px]">Notario de Fe Pública:</div>
-              <div className="text-white font-medium mt-0.5">
-                {notaryConfirmedAt ? "✓ Confirmado" : "⏳ Pendiente"}
-              </div>
-            </div>
-          </div>
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 print:hidden">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("danzas");
+              setSearch("");
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "danzas"
+                ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+                : "bg-slate-800 text-slate-400 hover:text-white"
+            }`}
+          >
+            Módulo A: Entrada Folklórica
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("candidatas");
+              setSearch("");
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+              activeTab === "candidatas"
+                ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
+                : "bg-slate-800 text-slate-400 hover:text-white"
+            }`}
+          >
+            Módulo B: Moperita y Ñusta
+          </button>
+        </div>
 
-          <div className="pt-2">
-            <Link
-              href="/login"
-              className="inline-block px-5 py-2.5 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white transition-colors"
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <Link
+            href="/vivo"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-center gap-2 transition-all"
+          >
+            <span>📺</span>
+            <span>Pantalla de auditorio</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+          >
+            <span>📊</span>
+            <span>Descargar Excel</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-2 transition-all"
+          >
+            <span>🖨️</span>
+            <span>Imprimir</span>
+          </button>
+        </div>
+      </div>
+
+      {activeTab === "candidatas" && data.moduleB.categories.length > 1 && (
+        <div className="flex flex-wrap gap-2 print:hidden">
+          {data.moduleB.categories.map((category) => (
+            <button
+              key={category.id}
+              type="button"
+              onClick={() => {
+                setActiveCategoryId(category.id);
+                setSearch("");
+              }}
+              className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                activeCategory?.id === category.id
+                  ? "bg-slate-100 text-slate-950 border-slate-100"
+                  : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"
+              }`}
             >
-              Iniciar Sesión de Personal Autorizado
-            </Link>
+              {category.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {podiumItems.length >= 3 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
+          <div className="order-2 md:order-1 bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-3 relative overflow-hidden shadow-xl">
+            <div className="w-12 h-12 bg-slate-400/10 text-slate-300 font-bold text-2xl rounded-2xl flex items-center justify-center mx-auto border border-slate-400/30">
+              🥈
+            </div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              2.º Lugar • Trofeo de Plata
+            </div>
+            <h3 className="text-xl font-bold text-white">{itemName(podiumItems[1])}</h3>
+            <p className="text-xs text-slate-400">{podiumItems[1].fraternityName}</p>
+            <div className="text-3xl font-extrabold text-white font-mono pt-2">
+              {formatScore(itemScore(podiumItems[1]))} pts
+            </div>
+          </div>
+
+          <div className="order-1 md:order-2 bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-900 border-2 border-amber-500/60 rounded-3xl p-8 text-center space-y-4 relative overflow-hidden shadow-2xl scale-105">
+            <div className="w-16 h-16 bg-amber-500/20 text-amber-400 font-bold text-3xl rounded-2xl flex items-center justify-center mx-auto border border-amber-500/50 shadow-lg shadow-amber-500/30">
+              🥇
+            </div>
+            <div className="text-xs font-black uppercase tracking-widest text-amber-400">
+              {activeTab === "danzas" ? "Gran Campeón • 1.er Lugar" : "Ganadora • 1.er Lugar"}
+            </div>
+            <h3 className="text-2xl font-black text-white">{itemName(podiumItems[0])}</h3>
+            <p className="text-sm font-semibold text-slate-300">
+              {podiumItems[0].fraternityName}
+            </p>
+            <div className="text-4xl font-black text-amber-400 font-mono pt-2">
+              {formatScore(itemScore(podiumItems[0]))} pts
+            </div>
+            <div className="text-xs text-emerald-400 font-semibold">
+              {activeTab === "danzas"
+                ? "Trofeo Institucional + Premio de Honor"
+                : "Corona y Banda Oficial"}
+            </div>
+          </div>
+
+          <div className="order-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-3 relative overflow-hidden shadow-xl">
+            <div className="w-12 h-12 bg-amber-700/10 text-amber-600 font-bold text-2xl rounded-2xl flex items-center justify-center mx-auto border border-amber-700/30">
+              🥉
+            </div>
+            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              3.er Lugar • Trofeo de Bronce
+            </div>
+            <h3 className="text-xl font-bold text-white">{itemName(podiumItems[2])}</h3>
+            <p className="text-xs text-slate-400">{podiumItems[2].fraternityName}</p>
+            <div className="text-3xl font-extrabold text-white font-mono pt-2">
+              {formatScore(itemScore(podiumItems[2]))} pts
+            </div>
           </div>
         </div>
       )}
 
-      {/* Si SÍ se han revelado los resultados: Tabla de Ganadores y Ranking */}
-      {resultsRevealed && (
-        <>
-          {/* Botones de acción (Exportar y Imprimir) */}
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-900 p-4 rounded-2xl border border-slate-800 print:hidden">
-            {/* Selector de módulo */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setActiveTab("danzas")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  activeTab === "danzas"
-                    ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
-                    : "bg-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                Módulo A: Entrada Folklórica (Danzas)
-              </button>
-              <button
-                onClick={() => setActiveTab("candidatas")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                  activeTab === "candidatas"
-                    ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20"
-                    : "bg-slate-800 text-slate-400 hover:text-white"
-                }`}
-              >
-                Módulo B: Moperita y Ñusta 2026
-              </button>
+      {activeTab === "danzas" && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-white">Tabla General de Calificaciones</h3>
+              <p className="text-xs text-slate-400">
+                {data.moduleA.summary.scoredParticipants}/{data.moduleA.summary.totalParticipants}{" "}
+                grupos calificados · {data.moduleA.summary.votesEmitted} votos emitidos
+              </p>
             </div>
-
-            {/* Exportaciones */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExport}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
-              >
-                <span>📊</span>
-                <span>Descargar Excel (.xlsx)</span>
-              </button>
-              <button
-                onClick={handlePrint}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 flex items-center gap-2 transition-all"
-              >
-                <span>🖨️</span>
-                <span>Imprimir Acta Oficial</span>
-              </button>
-            </div>
+            <input
+              type="text"
+              placeholder="Buscar danza o fraternidad..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 w-full sm:w-64"
+            />
           </div>
 
-          {/* PODIO DE GANADORES (TOP 3) - Módulo A */}
-          {activeTab === "danzas" && danceGroups.length >= 3 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4">
-              {/* 2.º Lugar */}
-              <div className="order-2 md:order-1 bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-3 relative overflow-hidden shadow-xl">
-                <div className="w-12 h-12 bg-slate-400/10 text-slate-300 font-bold text-2xl rounded-2xl flex items-center justify-center mx-auto border border-slate-400/30">
-                  🥈
-                </div>
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  2.º Lugar • Trofeo de Plata
-                </div>
-                <h3 className="text-xl font-bold text-white">{danceGroups[1].danceName}</h3>
-                <p className="text-xs text-slate-400">{danceGroups[1].fraternityName}</p>
-                <div className="text-3xl font-extrabold text-white font-mono pt-2">
-                  {danceGroups[1].finalScore.toFixed(2)} pts
-                </div>
-              </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[820px] text-left text-xs text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th className="p-3">Puesto</th>
+                  <th className="p-3">Danza</th>
+                  <th className="p-3">Fraternidad / Universidad</th>
+                  <th className="p-3 text-right">Votos</th>
+                  <th className="p-3 text-right">Promedio</th>
+                  <th className="p-3 text-right">Penalizaciones</th>
+                  <th className="p-3 text-right font-bold text-white">Nota Final</th>
+                  <th className="p-3">Estado</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredDance.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-bold text-amber-400 whitespace-nowrap">
+                      {item.isDisqualified ? "—" : rankLabel(item.rank)}
+                    </td>
+                    <td className="p-3 font-semibold text-white">{item.danceName}</td>
+                    <td className="p-3">
+                      <div>{item.fraternityName}</div>
+                      <div className="text-[11px] text-slate-500">{item.university}</div>
+                    </td>
+                    <td className="p-3 text-right font-mono text-slate-300">
+                      {item.votesCount}/{item.juryCount}
+                    </td>
+                    <td className="p-3 text-right font-mono text-slate-200">
+                      {formatScore(item.average)}
+                    </td>
+                    <td className="p-3 text-right font-mono text-rose-400">
+                      {item.penaltyTotal > 0 ? `−${formatScore(item.penaltyTotal)}` : "0.00"}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-white text-sm">
+                      {formatScore(item.finalScore)}
+                    </td>
+                    <td className="p-3">
+                      {item.isDisqualified ? (
+                        <span className="text-rose-400 font-semibold">DESCALIFICADO</span>
+                      ) : (
+                        <span
+                          className={
+                            item.status === "CLOSED"
+                              ? "text-emerald-400 font-semibold"
+                              : item.status === "IN_SCORING"
+                                ? "text-amber-400 font-semibold"
+                                : "text-slate-400 font-semibold"
+                          }
+                        >
+                          {statusLabel(item.status).toUpperCase()}
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-              {/* 1.er Lugar (Centro, más destacado) */}
-              <div className="order-1 md:order-2 bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-900 border-2 border-amber-500/60 rounded-3xl p-8 text-center space-y-4 relative overflow-hidden shadow-2xl scale-105">
-                <div className="w-16 h-16 bg-amber-500/20 text-amber-400 font-bold text-3xl rounded-2xl flex items-center justify-center mx-auto border border-amber-500/50 shadow-lg shadow-amber-500/30">
-                  🥇
-                </div>
-                <div className="text-xs font-black uppercase tracking-widest text-amber-400">
-                  Gran Campeón • 1.er Lugar
-                </div>
-                <h3 className="text-2xl font-black text-white">{danceGroups[0].danceName}</h3>
-                <p className="text-sm font-semibold text-slate-300">{danceGroups[0].fraternityName}</p>
-                <div className="text-4xl font-black text-amber-400 font-mono pt-2">
-                  {danceGroups[0].finalScore.toFixed(2)} pts
-                </div>
-                <div className="text-xs text-emerald-400 font-semibold">
-                  Trofeo Institucional + Premio de Honor
-                </div>
-              </div>
-
-              {/* 3.er Lugar */}
-              <div className="order-3 bg-slate-900 border border-slate-800 rounded-3xl p-6 text-center space-y-3 relative overflow-hidden shadow-xl">
-                <div className="w-12 h-12 bg-amber-700/10 text-amber-600 font-bold text-2xl rounded-2xl flex items-center justify-center mx-auto border border-amber-700/30">
-                  🥉
-                </div>
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                  3.er Lugar • Trofeo de Bronce
-                </div>
-                <h3 className="text-xl font-bold text-white">{danceGroups[2].danceName}</h3>
-                <p className="text-xs text-slate-400">{danceGroups[2].fraternityName}</p>
-                <div className="text-3xl font-extrabold text-white font-mono pt-2">
-                  {danceGroups[2].finalScore.toFixed(2)} pts
-                </div>
-              </div>
+          {filteredDance.length === 0 && (
+            <div className="py-10 text-center">
+              <div className="text-3xl mb-2">⏳</div>
+              <p className="text-sm font-semibold text-white">
+                Aún no hay calificaciones registradas
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                La tabla se actualizará automáticamente cuando los jurados emitan sus votos.
+              </p>
             </div>
           )}
-
-          {/* TABLA COMPLETA: MÓDULO A */}
-          {activeTab === "danzas" && (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <h3 className="text-lg font-bold text-white">Tabla General de Calificaciones</h3>
-                <input
-                  type="text"
-                  placeholder="Buscar danza o fraternidad..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 w-full sm:w-64"
-                />
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                    <tr>
-                      <th className="p-3">Puesto</th>
-                      <th className="p-3">Danza</th>
-                      <th className="p-3">Fraternidad / Universidad</th>
-                      <th className="p-3 text-right">Promedio Jurados</th>
-                      <th className="p-3 text-right">Penalizaciones</th>
-                      <th className="p-3 text-right font-bold text-white">Nota Final</th>
-                      <th className="p-3">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {filteredDance.map((g, idx) => (
-                      <tr key={g.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 font-bold text-amber-400">
-                          {idx === 0 && "🥇 1.º"}
-                          {idx === 1 && "🥈 2.º"}
-                          {idx === 2 && "🥉 3.º"}
-                          {idx > 2 && `${idx + 1}.º`}
-                        </td>
-                        <td className="p-3 font-semibold text-white">{g.danceName}</td>
-                        <td className="p-3">
-                          <div>{g.fraternityName}</div>
-                          <div className="text-[11px] text-slate-500">{g.university}</div>
-                        </td>
-                        <td className="p-3 text-right font-mono text-slate-200">
-                          {g.average.toFixed(2)}
-                        </td>
-                        <td className="p-3 text-right font-mono text-rose-400">
-                          {g.penaltyTotal > 0 ? `−${g.penaltyTotal.toFixed(2)}` : "0.00"}
-                        </td>
-                        <td className="p-3 text-right font-mono font-bold text-white text-sm">
-                          {g.isDisqualified ? "0.00" : g.finalScore.toFixed(2)}
-                        </td>
-                        <td className="p-3">
-                          {g.isDisqualified ? (
-                            <span className="text-rose-400 font-semibold">DESCALIFICADO</span>
-                          ) : (
-                            <span className="text-emerald-400 font-semibold">VÁLIDO</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TABLA COMPLETA: MÓDULO B */}
-          {activeTab === "candidatas" && (
-            <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
-              <h3 className="text-lg font-bold text-white">
-                Elección de Moperita y Ñusta de Bolivia 2026
-              </h3>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs text-slate-300">
-                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                    <tr>
-                      <th className="p-3">Puesto</th>
-                      <th className="p-3">Candidata</th>
-                      <th className="p-3">Categoría</th>
-                      <th className="p-3">Fraternidad</th>
-                      <th className="p-3 text-right">Ropa de Gala</th>
-                      <th className="p-3 text-right">Ropa Casual</th>
-                      <th className="p-3 text-right">Ropa Típica</th>
-                      <th className="p-3 text-right font-bold text-white">Nota Ponderada</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800">
-                    {candidates.map((c, idx) => (
-                      <tr key={c.id} className="hover:bg-slate-800/40">
-                        <td className="p-3 font-bold text-amber-400">
-                          {idx === 0 && "👑 Ganadora"}
-                          {idx === 1 && "🥈 2.ª"}
-                          {idx === 2 && "🥉 3.ª"}
-                          {idx > 2 && `${idx + 1}.ª`}
-                        </td>
-                        <td className="p-3 font-semibold text-white">{c.fullName}</td>
-                        <td className="p-3">{c.categoryName}</td>
-                        <td className="p-3">{c.fraternityName}</td>
-                        <td className="p-3 text-right font-mono">{c.galaScore.toFixed(2)}</td>
-                        <td className="p-3 text-right font-mono">{c.casualScore.toFixed(2)}</td>
-                        <td className="p-3 text-right font-mono">{c.tipicaScore.toFixed(2)}</td>
-                        <td className="p-3 text-right font-mono font-bold text-white text-sm">
-                          {c.totalScore.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
+
+      {activeTab === "candidatas" && (
+        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-xl space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-white">
+                {activeCategory?.name ?? "Moperita y Ñusta de Bolivia"}
+              </h3>
+              <p className="text-xs text-slate-400">
+                {activeCategory?.items.length ?? 0} candidatas ·{" "}
+                {activeCategory?.items.reduce((sum, item) => sum + item.votesCount, 0) ?? 0}{" "}
+                votos emitidos
+              </p>
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar candidata o fraternidad..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 w-full sm:w-64"
+            />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] text-left text-xs text-slate-300">
+              <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th className="p-3">Puesto</th>
+                  <th className="p-3">Candidata</th>
+                  <th className="p-3">Categoría</th>
+                  <th className="p-3">Fraternidad</th>
+                  <th className="p-3 text-right">Votos</th>
+                  <th className="p-3 text-right">Ropa de Gala</th>
+                  <th className="p-3 text-right">Ropa Casual</th>
+                  <th className="p-3 text-right">Ropa Típica</th>
+                  <th className="p-3 text-right font-bold text-white">Nota Ponderada</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800">
+                {filteredCandidates.map((item) => (
+                  <tr key={item.id} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-bold text-amber-400 whitespace-nowrap">
+                      {rankLabel(item.rank, true)}
+                    </td>
+                    <td className="p-3 font-semibold text-white">{item.fullName}</td>
+                    <td className="p-3">{item.categoryName}</td>
+                    <td className="p-3">{item.fraternityName}</td>
+                    <td className="p-3 text-right font-mono text-slate-300">
+                      {item.votesCount}/{item.runways.length * item.juryCount}
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      {formatScore(
+                        item.runways.find((runway) => runway.type === "GALA")?.average ?? 0
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      {formatScore(
+                        item.runways.find((runway) => runway.type === "CASUAL")?.average ?? 0
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-mono">
+                      {formatScore(
+                        item.runways.find((runway) => runway.type === "TIPICA")?.average ?? 0
+                      )}
+                    </td>
+                    <td className="p-3 text-right font-mono font-bold text-white text-sm">
+                      {formatScore(item.totalScore)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {filteredCandidates.length === 0 && (
+            <div className="py-10 text-center">
+              <div className="text-3xl mb-2">⏳</div>
+              <p className="text-sm font-semibold text-white">
+                Aún no hay calificaciones registradas
+              </p>
+              <p className="text-xs text-slate-400 mt-1">
+                La tabla se actualizará automáticamente cuando los jurados emitan sus votos.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-[10px] text-slate-500 text-center print:hidden">
+        Resultados preliminares en vivo. Solo se publican promedios, penalizaciones y notas
+        finales agregadas; las calificaciones individuales de cada jurado son reservadas.
+      </p>
     </div>
   );
 }

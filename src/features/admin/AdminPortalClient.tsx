@@ -1,10 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
-import {
-  confirmOpeningAdminAction,
-  updateEventConfigAction,
-} from "@/features/admin/actions";
+import { saveAllEventConfigsAction } from "@/features/admin/actions";
 import {
   disqualifyGroupAction,
   changeGroupStatusAction,
@@ -18,9 +16,6 @@ export interface AdminEditionData {
   id: string;
   name: string;
   year: number;
-  adminConfirmedAt: string | null;
-  notaryConfirmedAt: string | null;
-  resultsRevealed: boolean;
   scoringRule: "MEAN" | "TRIMMED_MEAN";
   decimals: number;
 }
@@ -55,12 +50,18 @@ export interface AdminGroupItem {
 export interface AdminCandidateItem {
   id: string;
   fullName: string;
+  categoryId: string;
   categoryName: string;
+  categorySlug: string; // "moperita" | "nusta"
   fraternityName: string;
   university: string;
   photoUrl: string | null;
   votesCount: number;
-  finalScore?: number;
+  galaAverage?: number;
+  casualAverage?: number;
+  tipicaAverage?: number;
+  totalScore?: number;
+  rank?: number | null;
 }
 
 export interface AdminAuditItem {
@@ -72,6 +73,25 @@ export interface AdminAuditItem {
   metadata?: unknown;
 }
 
+export interface AdminConfigData {
+  coreografiaWeight: number; // 40
+  vestimentaWeight: number;  // 30
+  entusiasmoWeight: number;  // 30
+  penaltyOrder: "BEFORE_AVERAGE" | "AFTER_AVERAGE";
+  galaWeight: number;    // 34
+  casualWeight: number;  // 33
+  tipicaWeight: number;  // 33
+  porteWeight: number;        // 25
+  carismaWeight: number;      // 25
+  autenticidadWeight: number; // 25
+  originalidadWeight: number; // 25
+  scoringRule: "MEAN" | "TRIMMED_MEAN";
+  decimals: number;
+  jurorsModuleA: number;
+  jurorsModuleB: number;
+  tieBreakOrder: string[];
+}
+
 interface AdminPortalClientProps {
   adminName: string;
   edition: AdminEditionData;
@@ -79,6 +99,7 @@ interface AdminPortalClientProps {
   candidates: AdminCandidateItem[];
   recentAudits: AdminAuditItem[];
   hasSubmittedVotes: boolean;
+  initialConfigs?: AdminConfigData;
 }
 
 export default function AdminPortalClient({
@@ -88,18 +109,23 @@ export default function AdminPortalClient({
   candidates,
   recentAudits,
   hasSubmittedVotes,
+  initialConfigs,
 }: AdminPortalClientProps) {
-  const [edition, setEdition] = useState<AdminEditionData>(initialEdition);
+  const edition = initialEdition;
   const [groups, setGroups] = useState<AdminGroupItem[]>(initialGroups);
-  const [activeTab, setActiveTab] = useState<"opening" | "groups" | "penalties" | "config" | "results" | "audit">("opening");
+  const [activeTab, setActiveTab] = useState<"groups" | "penalties" | "config" | "results" | "audit">("groups");
   const [isPending, startTransition] = useTransition();
+
+  // Results tab sub-state: Concurso A vs Concurso B
+  const [resultsContest, setResultsContest] = useState<"danzas" | "candidatas">("danzas");
+  const [resultsCategorySlug, setResultsCategorySlug] = useState<"moperita" | "nusta">("moperita");
 
   // Feedback notifications
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
   const showFeedback = (type: "success" | "error", text: string) => {
     setFeedback({ type, text });
-    setTimeout(() => setFeedback(null), 4000);
+    setTimeout(() => setFeedback(null), 5000);
   };
 
   // Modales
@@ -117,33 +143,25 @@ export default function AdminPortalClient({
     reason: string;
   }>({ isOpen: false, penaltyId: "", groupName: "", reason: "" });
 
-  // Configuración editable
-  const [configForm, setConfigForm] = useState({
-    coreografiaWeight: 40,
-    vestimentaWeight: 30,
-    entusiasmoWeight: 30,
-    scoringRule: edition.scoringRule,
-    yellowPenalty: 5,
-    redPenalty: 10,
-    orderPenalty: 5,
+  // Configuración editable completa (los 7 parámetros de la sección 5 del reglamento)
+  const [configForm, setConfigForm] = useState<AdminConfigData>({
+    coreografiaWeight: initialConfigs?.coreografiaWeight ?? 40,
+    vestimentaWeight: initialConfigs?.vestimentaWeight ?? 30,
+    entusiasmoWeight: initialConfigs?.entusiasmoWeight ?? 30,
+    penaltyOrder: initialConfigs?.penaltyOrder ?? "AFTER_AVERAGE",
+    galaWeight: initialConfigs?.galaWeight ?? 34,
+    casualWeight: initialConfigs?.casualWeight ?? 33,
+    tipicaWeight: initialConfigs?.tipicaWeight ?? 33,
+    porteWeight: initialConfigs?.porteWeight ?? 25,
+    carismaWeight: initialConfigs?.carismaWeight ?? 25,
+    autenticidadWeight: initialConfigs?.autenticidadWeight ?? 25,
+    originalidadWeight: initialConfigs?.originalidadWeight ?? 25,
+    scoringRule: initialConfigs?.scoringRule ?? edition.scoringRule ?? "MEAN",
+    decimals: initialConfigs?.decimals ?? edition.decimals ?? 2,
+    jurorsModuleA: initialConfigs?.jurorsModuleA ?? 5,
+    jurorsModuleB: initialConfigs?.jurorsModuleB ?? 5,
+    tieBreakOrder: initialConfigs?.tieBreakOrder ?? ["coreografia", "vestimenta", "entusiasmo"],
   });
-
-  // Confirmar apertura oficial
-  const handleConfirmOpening = () => {
-    startTransition(async () => {
-      const res = await confirmOpeningAdminAction(edition.id);
-      if (res.success) {
-        setEdition((prev) => ({
-          ...prev,
-          adminConfirmedAt: new Date().toISOString(),
-          resultsRevealed: !!prev.notaryConfirmedAt,
-        }));
-        showFeedback("success", "Apertura oficial confirmada por el Comité Organizador (ADMIN)");
-      } else {
-        showFeedback("error", res.error || "Error al confirmar apertura");
-      }
-    });
-  };
 
   // Cambiar estado de grupo
   const handleChangeGroupStatus = (groupId: string, newStatus: "PENDING" | "IN_SCORING" | "CLOSED") => {
@@ -180,9 +198,9 @@ export default function AdminPortalClient({
           )
         );
         setDisqualifyModal({ isOpen: false, groupId: "", groupName: "", reason: "" });
-        showFeedback("success", "Grupo descalificado correctamente y registrado en auditoría");
+        showFeedback("success", "Grupo descalificado conforme al reglamento");
       } else {
-        showFeedback("error", res.error || "Error al descalificar");
+        showFeedback("error", res.error || "Error al descalificar grupo");
       }
     });
   };
@@ -190,7 +208,7 @@ export default function AdminPortalClient({
   // Anular penalización
   const handleVoidPenalty = () => {
     if (!voidPenaltyModal.reason.trim()) {
-      showFeedback("error", "El motivo de anulación es obligatorio");
+      showFeedback("error", "El motivo de anulación es obligatorio para auditoría");
       return;
     }
     startTransition(async () => {
@@ -208,46 +226,78 @@ export default function AdminPortalClient({
           }))
         );
         setVoidPenaltyModal({ isOpen: false, penaltyId: "", groupName: "", reason: "" });
-        showFeedback("success", "Penalización anulada con registro en auditoría");
+        showFeedback("success", "Penalización anulada y registrada en auditoría");
       } else {
         showFeedback("error", res.error || "Error al anular penalización");
       }
     });
   };
 
-  // Guardar configuración
+  // Guardar configuración completa (los 7 parámetros)
   const handleSaveConfig = () => {
-    const totalWeights =
+    // 1. Validar suma de danza (debe ser 100%)
+    const sumA =
       configForm.coreografiaWeight + configForm.vestimentaWeight + configForm.entusiasmoWeight;
-    if (totalWeights !== 100) {
-      showFeedback("error", `Los pesos deben sumar exactamente 100%. Suma actual: ${totalWeights}%`);
+    if (sumA !== 100) {
+      showFeedback("error", `Los pesos de la Entrada Folklórica deben sumar 100%. Suma actual: ${sumA}%`);
+      return;
+    }
+
+    // 2. Validar suma de 3 pasadas (debe ser 100%)
+    const sumPasadas = configForm.galaWeight + configForm.casualWeight + configForm.tipicaWeight;
+    if (sumPasadas !== 100) {
+      showFeedback("error", `Los pesos de las 3 pasadas deben sumar 100%. Suma actual: ${sumPasadas}%`);
+      return;
+    }
+
+    // 3. Validar suma de 4 criterios de Moperita (debe ser 100%)
+    const sumCriteriosB =
+      configForm.porteWeight + configForm.carismaWeight + configForm.autenticidadWeight + configForm.originalidadWeight;
+    if (sumCriteriosB !== 100) {
+      showFeedback("error", `Los pesos de los 4 criterios de Moperita/Ñusta deben sumar 100%. Suma actual: ${sumCriteriosB}%`);
       return;
     }
 
     startTransition(async () => {
-      const res = await updateEventConfigAction({
+      const res = await saveAllEventConfigsAction({
         editionId: edition.id,
-        key: "moduleA.weights",
-        value: {
-          coreografia: configForm.coreografiaWeight / 100,
-          vestimenta: configForm.vestimentaWeight / 100,
-          entusiasmo: configForm.entusiasmoWeight / 100,
-          scoringRule: configForm.scoringRule,
+        moduleAWeights: {
+          coreografia: configForm.coreografiaWeight,
+          vestimenta: configForm.vestimentaWeight,
+          entusiasmo: configForm.entusiasmoWeight,
         },
-        description: "Pesos y regla de calificación para Módulo A (Entrada Folklórica)",
+        penaltyOrder: configForm.penaltyOrder,
+        moduleBCriteriaWeights: {
+          porteElegancia: configForm.porteWeight,
+          carismaSimpatia: configForm.carismaWeight,
+          autenticidadTraje: configForm.autenticidadWeight,
+          originalidadEstilo: configForm.originalidadWeight,
+        },
+        moduleBRunwayWeights: {
+          GALA: configForm.galaWeight,
+          CASUAL: configForm.casualWeight,
+          TIPICA: configForm.tipicaWeight,
+        },
+        scoringRule: configForm.scoringRule,
+        decimals: Number(configForm.decimals),
+        juryCount: {
+          moduleA: Number(configForm.jurorsModuleA),
+          moduleB: Number(configForm.jurorsModuleB),
+        },
+        tieBreakOrder: configForm.tieBreakOrder,
       });
 
       if (res.success) {
-        showFeedback("success", "Configuración guardada exitosamente");
+        showFeedback("success", "Todos los parámetros oficiales fueron guardados y registrados en auditoría.");
       } else {
-        showFeedback("error", res.error || "Error al guardar configuración");
+        showFeedback("error", res.error || "Error al guardar la configuración");
       }
     });
   };
 
-  // Exportar Excel
+  // Exportar Excel (incluyendo ambas hojas: Danzas y Candidatas)
   const handleExportExcel = () => {
-    const exportData = groups.map((g, idx) => ({
+    const exportDance = groups.map((g, idx) => ({
       puesto: g.isDisqualified ? "DESCALIFICADO" : idx + 1,
       danza: g.danceName,
       fraternidad: g.fraternityName,
@@ -265,12 +315,27 @@ export default function AdminPortalClient({
       estado: g.isDisqualified ? "DESCALIFICADO" : g.status,
     }));
 
+    const exportCandidates = candidates.map((c) => ({
+      puesto: c.rank ? `${c.rank}.º` : "Pendiente",
+      candidata: c.fullName,
+      categoria: c.categoryName,
+      fraternidad: `${c.fraternityName} (${c.university})`,
+      pasarelaGala: c.galaAverage || 0,
+      pasarelaCasual: c.casualAverage || 0,
+      pasarelaTipica: c.tipicaAverage || 0,
+      notaFinal: c.totalScore || 0,
+    }));
+
     exportResultsToExcel({
       editionName: edition.name,
-      danceGroups: exportData,
-      filename: `Resultados_${edition.name.replace(/\s+/g, "_")}.xlsx`,
+      danceGroups: exportDance,
+      candidates: exportCandidates,
+      filename: `Resultados_Oficiales_${edition.name.replace(/\s+/g, "_")}.xlsx`,
     });
   };
+
+  // Candidatas filtradas para la pestaña de resultados
+  const filteredCandidates = candidates.filter((c) => c.categorySlug === resultsCategorySlug);
 
   return (
     <div className="space-y-6">
@@ -285,26 +350,25 @@ export default function AdminPortalClient({
           </div>
           <h1 className="text-2xl font-bold text-white mt-1">{edition.name}</h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Panel de control general, apertura oficial, auditoría y gestión de calificaciones.
+            Panel de control general, auditoría y evaluación de los dos certámenes oficiales (Moperita y Entrada Folklórica).
           </p>
         </div>
 
-        {/* Estado de sobre cerrado */}
-        <div className="flex items-center gap-3">
-          <div
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 ${
-              edition.resultsRevealed
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300"
-                : "bg-amber-500/10 border-amber-500/30 text-amber-300"
-            }`}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/vivo"
+            className="px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 bg-rose-500/10 border-rose-500/30 text-rose-300 hover:bg-rose-500/20 transition-colors"
           >
-            <span>{edition.resultsRevealed ? "🔓" : "🔒"}</span>
-            <span>
-              {edition.resultsRevealed
-                ? "Resultados Revelados Oficialmente"
-                : "Modo Sobre Cerrado (Notas Bloqueadas)"}
-            </span>
-          </div>
+            <span>📺</span>
+            <span>Pantalla en vivo</span>
+          </Link>
+          <Link
+            href="/resultados"
+            className="px-3 py-2 rounded-xl border text-xs font-semibold flex items-center gap-2 bg-emerald-500/10 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 transition-colors"
+          >
+            <span>🌐</span>
+            <span>Resultados públicos</span>
+          </Link>
         </div>
       </header>
 
@@ -324,23 +388,22 @@ export default function AdminPortalClient({
         </div>
       )}
 
-      {/* Tabs */}
+      {/* Tabs Principales */}
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
         {[
-          { id: "opening", label: "Apertura Oficial (Doble Confirmación)" },
           { id: "groups", label: `Grupos de Danza (${groups.length})` },
           { id: "penalties", label: "Penalizaciones y Sanciones" },
-          { id: "config", label: "Configuración del Evento" },
-          { id: "results", label: "Resultados y Exportación" },
-          { id: "audit", label: "Auditoría en Tiempo Real" },
+          { id: "config", label: "⚙️ Parámetros Configurables (Reglamento)" },
+          { id: "results", label: "🏆 Resultados y Rankings Oficiales" },
+          { id: "audit", label: `Auditoría (${recentAudits.length})` },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as typeof activeTab)}
-            className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+            className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${
               activeTab === tab.id
                 ? "bg-indigo-600 text-white shadow-lg shadow-indigo-600/30"
-                : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white hover:bg-slate-800"
+                : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
             }`}
           >
             {tab.label}
@@ -348,92 +411,12 @@ export default function AdminPortalClient({
         ))}
       </div>
 
-      {/* TAB 1: APERTURA OFICIAL */}
-      {activeTab === "opening" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
-          <div>
-            <h2 className="text-xl font-bold text-white">
-              Apertura Oficial con Doble Confirmación
-            </h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Por reglamento, las notas numéricas no son visibles para nadie hasta que tanto el{" "}
-              <strong>Comité Organizador (ADMIN)</strong> como el <strong>Notario de Fe Pública</strong>{" "}
-              confirmen la apertura en acto público con sus respectivas sesiones.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Paso 1: Admin */}
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                  Paso 1: Comité Organizador
-                </span>
-                {edition.adminConfirmedAt ? (
-                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    ✓ Confirmado
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    Pendiente
-                  </span>
-                )}
-              </div>
-              <h3 className="font-bold text-white text-base">Firma Digital del Administrador</h3>
-              <p className="text-xs text-slate-400">
-                {edition.adminConfirmedAt
-                  ? `Confirmado el ${new Date(edition.adminConfirmedAt).toLocaleString("es-BO")}`
-                  : "Presiona para autorizar la apertura oficial de las plicas/sobres digitales."}
-              </p>
-              {!edition.adminConfirmedAt && (
-                <button
-                  disabled={isPending}
-                  onClick={handleConfirmOpening}
-                  className="w-full py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
-                >
-                  {isPending ? "Confirmando..." : "Confirmar Apertura (ADMIN)"}
-                </button>
-              )}
-            </div>
-
-            {/* Paso 2: Notario */}
-            <div className="bg-slate-950 p-5 rounded-xl border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider">
-                  Paso 2: Notario de Fe Pública
-                </span>
-                {edition.notaryConfirmedAt ? (
-                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    ✓ Confirmado
-                  </span>
-                ) : (
-                  <span className="px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                    Pendiente
-                  </span>
-                )}
-              </div>
-              <h3 className="font-bold text-white text-base">Firma Digital del Notario</h3>
-              <p className="text-xs text-slate-400">
-                {edition.notaryConfirmedAt
-                  ? `Confirmado el ${new Date(edition.notaryConfirmedAt).toLocaleString("es-BO")}`
-                  : "El Notario debe iniciar sesión en su propio panel (/notaria) para confirmar."}
-              </p>
-              <div className="text-xs text-slate-500 italic">
-                {edition.notaryConfirmedAt
-                  ? "Verificado y firmado."
-                  : "A la espera de la confirmación del Notario con su credencial."}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 2: GRUPOS DE DANZA */}
+      {/* TAB 1: GRUPOS DE DANZA */}
       {activeTab === "groups" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white">Grupos de Danza (Módulo A)</h2>
-            <span className="text-xs text-slate-400">Total: {groups.length} grupos</span>
+            <h2 className="text-lg font-bold text-white">Grupos de Danza Participantes</h2>
+            <span className="text-xs text-slate-400">{groups.length} grupos registrados</span>
           </div>
 
           <div className="overflow-x-auto">
@@ -442,76 +425,69 @@ export default function AdminPortalClient({
                 <tr>
                   <th className="p-3">Orden</th>
                   <th className="p-3">Danza</th>
-                  <th className="p-3">Fraternidad / Universidad</th>
-                  <th className="p-3">Bailarines</th>
-                  <th className="p-3">Votos</th>
-                  <th className="p-3">Estado</th>
+                  <th className="p-3">Fraternidad</th>
+                  <th className="p-3">Universidad</th>
+                  <th className="p-3 text-center">Bailarines</th>
+                  <th className="p-3 text-center">Votos</th>
+                  <th className="p-3 text-center">Estado</th>
                   <th className="p-3 text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {groups.map((group) => (
-                  <tr key={group.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="p-3 font-bold text-amber-400">#{group.entryOrder || "—"}</td>
-                    <td className="p-3 font-semibold text-white">{group.danceName}</td>
-                    <td className="p-3">
-                      <div>{group.fraternityName}</div>
-                      <div className="text-[11px] text-slate-400">{group.university}</div>
+                  <tr key={group.id} className="hover:bg-slate-800/40">
+                    <td className="p-3 font-mono text-amber-400 font-bold">
+                      #{String(group.entryOrder || 0).padStart(2, "0")}
                     </td>
-                    <td className="p-3">
-                      <span className={group.numberOfDancers < 50 ? "text-amber-400 font-bold" : ""}>
-                        {group.numberOfDancers}
+                    <td className="p-3 font-semibold text-white">{group.danceName}</td>
+                    <td className="p-3">{group.fraternityName}</td>
+                    <td className="p-3 text-slate-400">{group.university}</td>
+                    <td className="p-3 text-center font-mono">{group.numberOfDancers}</td>
+                    <td className="p-3 text-center font-mono">
+                      <span className="px-2 py-0.5 rounded-full bg-slate-800 text-indigo-400 font-bold">
+                        {group.votesCount}
                       </span>
                     </td>
-                    <td className="p-3 font-mono">{group.votesCount} jurados</td>
-                    <td className="p-3">
+                    <td className="p-3 text-center">
                       {group.isDisqualified ? (
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
                           DESCALIFICADO
                         </span>
+                      ) : group.status === "IN_SCORING" ? (
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold animate-pulse">
+                          EN PISTA
+                        </span>
+                      ) : group.status === "CLOSED" ? (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                          CERRADO
+                        </span>
                       ) : (
-                        <span
-                          className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                            group.status === "IN_SCORING"
-                              ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
-                              : group.status === "CLOSED"
-                              ? "bg-slate-800 text-slate-400"
-                              : "bg-blue-500/20 text-blue-300"
-                          }`}
-                        >
-                          {group.status}
+                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">
+                          PENDIENTE
                         </span>
                       )}
                     </td>
-                    <td className="p-3 text-right space-x-2">
-                      {/* Cambiar estado */}
-                      {!group.isDisqualified && (
-                        <>
-                          {group.status === "PENDING" && (
-                            <button
-                              disabled={isPending}
-                              onClick={() => handleChangeGroupStatus(group.id, "IN_SCORING")}
-                              className="px-2.5 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs disabled:opacity-50"
-                            >
-                              Abrir Votación
-                            </button>
-                          )}
-                          {group.status === "IN_SCORING" && (
-                            <button
-                              disabled={isPending}
-                              onClick={() => handleChangeGroupStatus(group.id, "CLOSED")}
-                              className="px-2.5 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white font-semibold text-xs disabled:opacity-50"
-                            >
-                              Cerrar Votos
-                            </button>
-                          )}
-                        </>
-                      )}
-
-                      {/* Descalificar */}
-                      {!group.isDisqualified && (
+                    <td className="p-3 text-right space-x-1">
+                      {group.status === "PENDING" && !group.isDisqualified && (
                         <button
                           disabled={isPending}
+                          onClick={() => handleChangeGroupStatus(group.id, "IN_SCORING")}
+                          className="px-2 py-1 rounded bg-amber-600 hover:bg-amber-500 text-white font-semibold text-[11px]"
+                        >
+                          Habilitar Voto
+                        </button>
+                      )}
+                      {group.status === "IN_SCORING" && !group.isDisqualified && (
+                        <button
+                          disabled={isPending}
+                          onClick={() => handleChangeGroupStatus(group.id, "CLOSED")}
+                          className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white font-semibold text-[11px]"
+                        >
+                          Cerrar Voto
+                        </button>
+                      )}
+                      {!group.isDisqualified && (
+                        <button
                           onClick={() =>
                             setDisqualifyModal({
                               isOpen: true,
@@ -520,7 +496,7 @@ export default function AdminPortalClient({
                               reason: "",
                             })
                           }
-                          className="px-2.5 py-1 rounded bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 border border-rose-600/40 text-xs font-semibold disabled:opacity-50"
+                          className="px-2 py-1 rounded bg-rose-600/20 hover:bg-rose-600 text-rose-300 hover:text-white font-semibold text-[11px]"
                         >
                           Descalificar
                         </button>
@@ -534,189 +510,485 @@ export default function AdminPortalClient({
         </div>
       )}
 
-      {/* TAB 3: PENALIZACIONES */}
+      {/* TAB 2: PENALIZACIONES */}
       {activeTab === "penalties" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-white">Registro General de Penalizaciones</h2>
+            <div>
+              <h2 className="text-lg font-bold text-white">Historial de Penalizaciones</h2>
+              <p className="text-xs text-slate-400">
+                Sanciones registradas por el personal de Control. Las anulaciones quedan registradas en auditoría.
+              </p>
+            </div>
           </div>
 
           <div className="space-y-3">
             {groups
-              .flatMap((g) =>
-                g.penalties.map((p) => ({
-                  ...p,
-                  groupName: `${g.entryOrder ? `#${g.entryOrder} ` : ""}${g.danceName} (${g.fraternityName})`,
-                }))
-              )
+              .flatMap((g) => g.penalties.map((p) => ({ ...p, groupName: g.danceName, fraternity: g.fraternityName })))
               .map((penalty) => (
                 <div
                   key={penalty.id}
-                  className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 ${
+                  className={`p-4 rounded-xl border flex justify-between items-center ${
                     penalty.isVoided
-                      ? "bg-slate-950/40 border-slate-800/40 opacity-60 line-through"
+                      ? "bg-slate-950/40 border-slate-800/60 opacity-50"
                       : "bg-slate-950 border-slate-800"
                   }`}
                 >
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-white">{penalty.groupName}</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          penalty.type === "YELLOW_FLAG"
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            : penalty.type === "RED_FLAG"
+                            ? "bg-rose-500/20 text-rose-400 border border-rose-500/30"
+                            : "bg-indigo-500/20 text-indigo-400 border border-indigo-500/30"
+                        }`}
+                      >
                         {penalty.type}
                       </span>
+                      <span className="font-bold text-white text-xs">{penalty.groupName}</span>
+                      <span className="text-slate-400 text-xs">({penalty.fraternity})</span>
                       {penalty.isVoided && (
-                        <span className="text-xs text-rose-400 font-bold">ANULADA</span>
+                        <span className="text-[10px] bg-rose-950 text-rose-400 px-2 py-0.5 rounded font-bold">
+                          ANULADA
+                        </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">{penalty.observation || "Sin observación"}</p>
-                    <div className="text-[11px] text-slate-500 mt-0.5">
-                      Registrado por: {penalty.registeredBy} •{" "}
-                      {new Date(penalty.registeredAt).toLocaleString("es-BO")}
-                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {penalty.observation || "Sin observación"} &bull;{" "}
+                      <span className="font-mono text-slate-500">
+                        {new Date(penalty.registeredAt).toLocaleTimeString("es-BO")}
+                      </span>
+                    </p>
                   </div>
 
-                  {!penalty.isVoided && (
-                    <button
-                      disabled={isPending}
-                      onClick={() =>
-                        setVoidPenaltyModal({
-                          isOpen: true,
-                          penaltyId: penalty.id,
-                          groupName: penalty.groupName,
-                          reason: "",
-                        })
-                      }
-                      className="px-3 py-1 rounded-xl text-xs font-semibold bg-rose-600/20 text-rose-300 hover:bg-rose-600/30 border border-rose-600/40"
-                    >
-                      Anular con Motivo
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono font-bold text-rose-400 text-sm">
+                      −{penalty.points} pts
+                    </span>
+                    {!penalty.isVoided && (
+                      <button
+                        onClick={() =>
+                          setVoidPenaltyModal({
+                            isOpen: true,
+                            penaltyId: penalty.id,
+                            groupName: `${penalty.groupName} (${penalty.type})`,
+                            reason: "",
+                          })
+                        }
+                        className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+                      >
+                        Anular
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
           </div>
         </div>
       )}
 
-      {/* TAB 4: CONFIGURACIÓN */}
+      {/* TAB 3: CONFIGURACIÓN OFICIAL (SECCIÓN 5 DEL REGLAMENTO) */}
       {activeTab === "config" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-8">
           <div>
-            <h2 className="text-xl font-bold text-white">Parámetros Configurables del Evento</h2>
-            <p className="text-sm text-slate-400 mt-1">
-              Todos los parámetros no especificados en el reglamento son configurables. Los cambios se registran en auditoría.
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
+                Reglamento Oficial 2026 &bull; Sección 5
+              </span>
+            </div>
+            <h2 className="text-xl font-bold text-white mt-1">Parámetros Configurables de Evaluación</h2>
+            <p className="text-xs text-slate-400 mt-1">
+              Todos los puntos que el reglamento no define como valores fijos se configuran aquí. Ningún valor está hardcodeado. Los cambios se registran inmutablemente en el libro de auditoría.
               {hasSubmittedVotes && (
-                <span className="text-amber-400 block mt-1">
-                  ⚠️ Ya existen votos emitidos en el sistema. Los cambios en pesos y escalas están protegidos por auditoría.
+                <span className="text-amber-400 block mt-1 font-semibold">
+                  ⚠️ Ya existen calificaciones emitidas. Toda actualización recalcula de inmediato los rankings en vivo y queda firmada en auditoría.
                 </span>
               )}
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-4">
-              <h3 className="font-bold text-white text-base">Pesos de Criterios — Módulo A</h3>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Coreografía (%):
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={configForm.coreografiaWeight}
-                  onChange={(e) =>
-                    setConfigForm((prev) => ({ ...prev, coreografiaWeight: Number(e.target.value) }))
-                  }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white"
-                />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* SECCIÓN 1: CONCURSO B — ENTRADA FOLKLÓRICA */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <span>🎭</span>
+                  <span>Concurso B: Entrada Folklórica (Danzas)</span>
+                </h3>
+                <span className="text-[11px] text-slate-400 font-mono">Reglamento: 0–100 pts</span>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Vestimenta (%):
-                </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={configForm.vestimentaWeight}
-                  onChange={(e) =>
-                    setConfigForm((prev) => ({ ...prev, vestimentaWeight: Number(e.target.value) }))
-                  }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white"
-                />
+
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300 font-medium">Ponderación de los 3 Criterios Oficiales:</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Coreografía (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.coreografiaWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, coreografiaWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                    <span className="text-[10px] text-slate-500">Defecto: 40%</span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Vestimenta (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.vestimentaWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, vestimentaWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                    <span className="text-[10px] text-slate-500">Defecto: 30%</span>
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Entusiasmo (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.entusiasmoWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, entusiasmoWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                    <span className="text-[10px] text-slate-500">Defecto: 30%</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs font-mono pt-1">
+                  <span className="text-slate-400">Suma requerida: 100%</span>
+                  <span
+                    className={
+                      configForm.coreografiaWeight + configForm.vestimentaWeight + configForm.entusiasmoWeight === 100
+                        ? "text-emerald-400 font-bold"
+                        : "text-rose-400 font-bold"
+                    }
+                  >
+                    Suma actual: {configForm.coreografiaWeight + configForm.vestimentaWeight + configForm.entusiasmoWeight}%
+                  </span>
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Entusiasmo (%):
+
+              {/* Orden de aplicación de penalizaciones */}
+              <div className="pt-3 border-t border-slate-800 space-y-2">
+                <label className="block text-xs font-semibold text-slate-300">
+                  Orden de Aplicación de Penalizaciones:
                 </label>
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={configForm.entusiasmoWeight}
+                <select
+                  value={configForm.penaltyOrder}
                   onChange={(e) =>
-                    setConfigForm((prev) => ({ ...prev, entusiasmoWeight: Number(e.target.value) }))
+                    setConfigForm((p) => ({
+                      ...p,
+                      penaltyOrder: e.target.value as "BEFORE_AVERAGE" | "AFTER_AVERAGE",
+                    }))
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white"
-                />
-              </div>
-              <div className="text-xs text-slate-400 font-mono">
-                Suma total:{" "}
-                <span
-                  className={
-                    configForm.coreografiaWeight + configForm.vestimentaWeight + configForm.entusiasmoWeight === 100
-                      ? "text-emerald-400 font-bold"
-                      : "text-rose-400 font-bold"
-                  }
+                  className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
                 >
-                  {configForm.coreografiaWeight + configForm.vestimentaWeight + configForm.entusiasmoWeight}%
-                </span>{" "}
-                (debe ser 100%)
+                  <option value="AFTER_AVERAGE">
+                    Después de promediar las notas de los jurados (Recomendado / Estándar)
+                  </option>
+                  <option value="BEFORE_AVERAGE">
+                    Antes de promediar (se descuenta a la nota de cada jurado acotando en 0)
+                  </option>
+                </select>
+                <p className="text-[11px] text-slate-500">
+                  Reglamento 3.2: 3 amarillas = −5 pts; roja = −10 pts; orden = −5 pts.
+                </p>
               </div>
             </div>
 
-            <div className="space-y-4">
-              <h3 className="font-bold text-white text-base">Reglas de Cálculo y Penalizaciones</h3>
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Método de Agregación entre Jurados:
-                </label>
-                <select
-                  value={configForm.scoringRule}
-                  onChange={(e) =>
-                    setConfigForm((prev) => ({ ...prev, scoringRule: e.target.value as "MEAN" | "TRIMMED_MEAN" }))
-                  }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-sm text-white"
-                >
-                  <option value="MEAN">Promedio Simple (MEAN)</option>
-                  <option value="TRIMMED_MEAN">Promedio Recortado (descarta máx. y mín.)</option>
-                </select>
+            {/* SECCIÓN 2: CONCURSO A — MOPERITA Y ÑUSTA DE BOLIVIA */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <h3 className="font-bold text-white text-sm flex items-center gap-2">
+                  <span>👑</span>
+                  <span>Concurso A: Moperita y Ñusta de Bolivia</span>
+                </h3>
+                <span className="text-[11px] text-slate-400 font-mono">3 pasadas &bull; 4 criterios</span>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Penalización cada 3 Banderolas Amarillas:
-                </label>
-                <input
-                  type="number"
-                  value={configForm.yellowPenalty}
-                  disabled
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-400"
-                />
-                <span className="text-[11px] text-slate-500">Reglamento: −5 puntos por cada 3 amarillas</span>
+              {/* Ponderación de las 3 Pasadas */}
+              <div className="space-y-3">
+                <p className="text-xs text-slate-300 font-medium">Ponderación de las 3 Pasadas Obligatorias:</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Ropa de Gala (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.galaWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, galaWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Ropa Casual (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.casualWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, casualWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                      Ropa Típica (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.tipicaWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, tipicaWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs font-mono pt-1">
+                  <span className="text-slate-400">Suma requerida: 100%</span>
+                  <span
+                    className={
+                      configForm.galaWeight + configForm.casualWeight + configForm.tipicaWeight === 100
+                        ? "text-emerald-400 font-bold"
+                        : "text-rose-400 font-bold"
+                    }
+                  >
+                    Suma actual: {configForm.galaWeight + configForm.casualWeight + configForm.tipicaWeight}%
+                  </span>
+                </div>
               </div>
 
-              <div>
+              {/* Ponderación de los 4 Criterios */}
+              <div className="pt-3 border-t border-slate-800 space-y-3">
+                <p className="text-xs text-slate-300 font-medium">Ponderación de los 4 Criterios de Evaluación:</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1 truncate" title="Porte y elegancia">
+                      1. Porte y Elegancia (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.porteWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, porteWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1 truncate" title="Carisma y simpatía">
+                      2. Carisma y Simpatía (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.carismaWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, carismaWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1 truncate" title="Autenticidad traje típico">
+                      3. Autenticidad Típica (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.autenticidadWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, autenticidadWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-400 mb-1 truncate" title="Originalidad y estilo casual">
+                      4. Originalidad Casual (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={100}
+                      value={configForm.originalidadWeight}
+                      onChange={(e) =>
+                        setConfigForm((p) => ({ ...p, originalidadWeight: Number(e.target.value) }))
+                      }
+                      className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-between items-center text-xs font-mono pt-1">
+                  <span className="text-slate-400">Suma requerida: 100%</span>
+                  <span
+                    className={
+                      configForm.porteWeight +
+                        configForm.carismaWeight +
+                        configForm.autenticidadWeight +
+                        configForm.originalidadWeight ===
+                      100
+                        ? "text-emerald-400 font-bold"
+                        : "text-rose-400 font-bold"
+                    }
+                  >
+                    Suma actual:{" "}
+                    {configForm.porteWeight +
+                      configForm.carismaWeight +
+                      configForm.autenticidadWeight +
+                      configForm.originalidadWeight}
+                    %
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* SECCIÓN 3: REGLAS GENERALES Y DESEMPATE */}
+            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4 lg:col-span-2">
+              <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-2">
+                <span>⚙️</span>
+                <span>Reglas Generales de Calificación y Escrutinio</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Método de Agregación:
+                  </label>
+                  <select
+                    value={configForm.scoringRule}
+                    onChange={(e) =>
+                      setConfigForm((p) => ({
+                        ...p,
+                        scoringRule: e.target.value as "MEAN" | "TRIMMED_MEAN",
+                      }))
+                    }
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                  >
+                    <option value="MEAN">Promedio Simple (MEAN - Recomendado)</option>
+                    <option value="TRIMMED_MEAN">Promedio Recortado (descarta máx y mín)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Redondeo de Decimales:
+                  </label>
+                  <select
+                    value={configForm.decimals}
+                    onChange={(e) =>
+                      setConfigForm((p) => ({
+                        ...p,
+                        decimals: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white"
+                  >
+                    <option value={0}>0 decimales (ej. 85)</option>
+                    <option value={1}>1 decimal (ej. 85.3)</option>
+                    <option value={2}>2 decimales (ej. 85.33 - Estándar)</option>
+                    <option value={3}>3 decimales (ej. 85.333)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Jurados Entrada (Mod. A):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={configForm.jurorsModuleA}
+                    onChange={(e) =>
+                      setConfigForm((p) => ({
+                        ...p,
+                        jurorsModuleA: Math.max(1, Number(e.target.value)),
+                      }))
+                    }
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Jurados Moperita (Mod. B):
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={configForm.jurorsModuleB}
+                    onChange={(e) =>
+                      setConfigForm((p) => ({
+                        ...p,
+                        jurorsModuleB: Math.max(1, Number(e.target.value)),
+                      }))
+                    }
+                    className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Criterio de desempate */}
+              <div className="pt-2">
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Penalización por Banderola Roja:
+                  Criterio de Desempate (Prioridad en orden descendente):
                 </label>
-                <input
-                  type="number"
-                  value={configForm.redPenalty}
-                  disabled
-                  className="w-full bg-slate-950/60 border border-slate-800 rounded-xl px-4 py-2 text-sm text-slate-400"
-                />
-                <span className="text-[11px] text-slate-500">Reglamento: −10 puntos por cada roja</span>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                    1.º Mayor nota en Coreografía
+                  </span>
+                  <span className="text-slate-500">&gt;</span>
+                  <span className="px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                    2.º Mayor nota en Vestimenta
+                  </span>
+                  <span className="text-slate-500">&gt;</span>
+                  <span className="px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                    3.º Menor cantidad de penalizaciones
+                  </span>
+                  <span className="text-slate-500">&gt;</span>
+                  <span className="px-3 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                    4.º Orden de ingreso original
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -725,88 +997,209 @@ export default function AdminPortalClient({
             <button
               disabled={isPending}
               onClick={handleSaveConfig}
-              className="px-6 py-2.5 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50"
+              className="px-6 py-3 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer"
             >
-              {isPending ? "Guardando..." : "Guardar y Registrar en Auditoría"}
+              <span>💾</span>
+              <span>{isPending ? "Guardando..." : "Guardar Configuración Oficial del Comité"}</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* TAB 5: RESULTADOS */}
+      {/* TAB 4: RESULTADOS OFICIALES Y RANKING */}
       {activeTab === "results" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <h2 className="text-xl font-bold text-white">Resultados Oficiales de la Entrada</h2>
+              <h2 className="text-xl font-bold text-white">Resultados Oficiales de los Concursos</h2>
               <p className="text-xs text-slate-400">
-                {edition.resultsRevealed
-                  ? "Resultados oficiales abiertos al público"
-                  : "Modo sobre cerrado: visible únicamente tras confirmación doble."}
+                Los dos concursos tienen cómputo y proclamación completamente separados.
               </p>
             </div>
             <button
               onClick={handleExportExcel}
-              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all"
+              className="px-4 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white flex items-center gap-2 shadow-lg shadow-emerald-600/20 transition-all cursor-pointer"
             >
               <span>📊</span>
-              <span>Exportar a Excel (.xlsx)</span>
+              <span>Exportar Ambos Concursos a Excel (.xlsx)</span>
             </button>
           </div>
 
-          {/* Ranking */}
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-300">
-              <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
-                <tr>
-                  <th className="p-3">Puesto</th>
-                  <th className="p-3">Danza</th>
-                  <th className="p-3">Fraternidad / Universidad</th>
-                  <th className="p-3 text-right">Promedio</th>
-                  <th className="p-3 text-right">Penalizaciones</th>
-                  <th className="p-3 text-right font-bold text-white">Nota Final</th>
-                  <th className="p-3">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800">
-                {groups.map((group, idx) => (
-                  <tr key={group.id} className="hover:bg-slate-800/40">
-                    <td className="p-3 font-bold text-amber-400">
-                      {idx === 0 && "🥇 1.º Lugar"}
-                      {idx === 1 && "🥈 2.º Lugar"}
-                      {idx === 2 && "🥉 3.º Lugar"}
-                      {idx > 2 && `${idx + 1}.º`}
-                    </td>
-                    <td className="p-3 font-semibold text-white">{group.danceName}</td>
-                    <td className="p-3">{group.fraternityName}</td>
-                    <td className="p-3 text-right font-mono">
-                      {edition.resultsRevealed ? (group.averageScore?.toFixed(2) || "0.00") : "🔒"}
-                    </td>
-                    <td className="p-3 text-right font-mono text-rose-400">
-                      −{group.penaltiesTotal || 0}
-                    </td>
-                    <td className="p-3 text-right font-mono font-bold text-white text-sm">
-                      {edition.resultsRevealed ? (group.finalScore?.toFixed(2) || "0.00") : "🔒"}
-                    </td>
-                    <td className="p-3">
-                      {group.isDisqualified ? (
-                        <span className="text-rose-400 font-semibold">DESCALIFICADO</span>
-                      ) : (
-                        <span className="text-emerald-400 font-semibold">VÁLIDO</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Selector de Concurso */}
+          <div className="flex gap-2 border-b border-slate-800 pb-3">
+            <button
+              onClick={() => setResultsContest("danzas")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                resultsContest === "danzas"
+                  ? "bg-amber-500 text-slate-950 shadow-md"
+                  : "bg-slate-950 text-slate-400 hover:text-white"
+              }`}
+            >
+              🎭 Concurso B: Entrada Folklórica ({groups.length} grupos)
+            </button>
+            <button
+              onClick={() => setResultsContest("candidatas")}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                resultsContest === "candidatas"
+                  ? "bg-amber-500 text-slate-950 shadow-md"
+                  : "bg-slate-950 text-slate-400 hover:text-white"
+              }`}
+            >
+              👑 Concurso A: Moperita y Ñusta de Bolivia ({candidates.length} candidatas)
+            </button>
           </div>
+
+          {/* VISTA CONCURSO B: DANZAS */}
+          {resultsContest === "danzas" && (
+            <div className="space-y-4">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">Puesto</th>
+                      <th className="p-3">Danza</th>
+                      <th className="p-3">Fraternidad / Universidad</th>
+                      <th className="p-3 text-right">Promedio Jurados</th>
+                      <th className="p-3 text-right">Penalizaciones</th>
+                      <th className="p-3 text-right font-bold text-white">Nota Final</th>
+                      <th className="p-3">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {groups.map((group, idx) => (
+                      <tr key={group.id} className="hover:bg-slate-800/40">
+                        <td className="p-3 font-bold text-amber-400">
+                          {idx === 0 && "🥇 1.º Lugar"}
+                          {idx === 1 && "🥈 2.º Lugar"}
+                          {idx === 2 && "🥉 3.º Lugar"}
+                          {idx > 2 && `${idx + 1}.º`}
+                        </td>
+                        <td className="p-3 font-semibold text-white">{group.danceName}</td>
+                        <td className="p-3">
+                          {group.fraternityName} &bull;{" "}
+                          <span className="text-slate-400">{group.university}</span>
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          {group.averageScore !== undefined ? group.averageScore.toFixed(configForm.decimals) : "0.00"}
+                        </td>
+                        <td className="p-3 text-right font-mono text-rose-400">
+                          {group.penaltiesTotal ? `−${group.penaltiesTotal}` : "0"}
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-white text-sm">
+                          {group.finalScore !== undefined ? group.finalScore.toFixed(configForm.decimals) : "0.00"}
+                        </td>
+                        <td className="p-3">
+                          {group.isDisqualified ? (
+                            <span className="text-rose-400 font-semibold">DESCALIFICADO</span>
+                          ) : (
+                            <span className="text-emerald-400 font-semibold">VÁLIDO</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* VISTA CONCURSO A: CANDIDATAS */}
+          {resultsContest === "candidatas" && (
+            <div className="space-y-4">
+              {/* Sub-selector de categoría */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setResultsCategorySlug("moperita")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    resultsCategorySlug === "moperita"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-950 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  🌿 Moperita de Bolivia ({candidates.filter((c) => c.categorySlug === "moperita").length})
+                </button>
+                <button
+                  onClick={() => setResultsCategorySlug("nusta")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    resultsCategorySlug === "nusta"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-slate-950 text-slate-400 hover:text-white"
+                  }`}
+                >
+                  👑 Ñusta de Bolivia ({candidates.filter((c) => c.categorySlug === "nusta").length})
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                    <tr>
+                      <th className="p-3">Puesto</th>
+                      <th className="p-3">Candidata</th>
+                      <th className="p-3">Fraternidad / Universidad</th>
+                      <th className="p-3 text-right">Gala ({configForm.galaWeight}%)</th>
+                      <th className="p-3 text-right">Casual ({configForm.casualWeight}%)</th>
+                      <th className="p-3 text-right">Típica ({configForm.tipicaWeight}%)</th>
+                      <th className="p-3 text-center">Votos</th>
+                      <th className="p-3 text-right font-bold text-white">Nota Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800">
+                    {filteredCandidates.map((c) => (
+                      <tr key={c.id} className="hover:bg-slate-800/40">
+                        <td className="p-3 font-bold text-amber-400">
+                          {c.rank === 1 && "👑 Ganadora"}
+                          {c.rank === 2 && "🥈 2.ª"}
+                          {c.rank === 3 && "🥉 3.ª"}
+                          {c.rank && c.rank > 3 && `${c.rank}.ª`}
+                          {!c.rank && "—"}
+                        </td>
+                        <td className="p-3 font-semibold text-white">{c.fullName}</td>
+                        <td className="p-3">
+                          {c.fraternityName} &bull;{" "}
+                          <span className="text-slate-400">{c.university}</span>
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          {c.galaAverage !== undefined ? c.galaAverage.toFixed(configForm.decimals) : "—"}
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          {c.casualAverage !== undefined ? c.casualAverage.toFixed(configForm.decimals) : "—"}
+                        </td>
+                        <td className="p-3 text-right font-mono">
+                          {c.tipicaAverage !== undefined ? c.tipicaAverage.toFixed(configForm.decimals) : "—"}
+                        </td>
+                        <td className="p-3 text-center font-mono">
+                          <span className="px-2 py-0.5 rounded-full bg-slate-800 text-indigo-400 font-bold">
+                            {c.votesCount}
+                          </span>
+                        </td>
+                        <td className="p-3 text-right font-mono font-bold text-white text-sm">
+                          {c.totalScore !== undefined ? c.totalScore.toFixed(configForm.decimals) : "0.00"}
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredCandidates.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="p-8 text-center text-slate-500">
+                          No hay candidatas registradas en esta categoría.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* TAB 6: AUDITORÍA */}
+      {/* TAB 5: AUDITORÍA */}
       {activeTab === "audit" && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <h2 className="text-xl font-bold text-white">Registro Inmutable de Auditoría</h2>
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-bold text-white">Registro Inmutable de Auditoría</h2>
+            <span className="text-xs text-slate-400">{recentAudits.length} eventos recientes</span>
+          </div>
           <div className="space-y-2">
             {recentAudits.map((audit) => (
               <div
@@ -854,14 +1247,14 @@ export default function AdminPortalClient({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setDisqualifyModal({ isOpen: false, groupId: "", groupName: "", reason: "" })}
-                className="px-4 py-2 rounded-xl text-xs text-slate-400"
+                className="px-4 py-2 rounded-xl text-xs text-slate-400 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 disabled={isPending || !disqualifyModal.reason.trim()}
                 onClick={handleDisqualify}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 cursor-pointer"
               >
                 Confirmar Descalificación
               </button>
@@ -895,14 +1288,14 @@ export default function AdminPortalClient({
             <div className="flex justify-end gap-2 pt-2">
               <button
                 onClick={() => setVoidPenaltyModal({ isOpen: false, penaltyId: "", groupName: "", reason: "" })}
-                className="px-4 py-2 rounded-xl text-xs text-slate-400"
+                className="px-4 py-2 rounded-xl text-xs text-slate-400 cursor-pointer"
               >
                 Cancelar
               </button>
               <button
                 disabled={isPending || !voidPenaltyModal.reason.trim()}
                 onClick={handleVoidPenalty}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-500 text-white disabled:opacity-50 cursor-pointer"
               >
                 Confirmar Anulación
               </button>

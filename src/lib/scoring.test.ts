@@ -118,7 +118,41 @@ describe("Módulo A: Fórmula de cálculo de grupo de danza", () => {
       const result = calculateDanceGroupFinalScore(juryScores, penalties);
       expect(result.average).toBe(22);
       expect(result.penaltyTotal).toBe(50);
-      expect(result.finalScore).toBe(0); // No baja a -28, queda en 0
+      expect(result.finalScore).toBe(0);
+    });
+
+    it("aplica orden de penalizaciones BEFORE_AVERAGE vs AFTER_AVERAGE", () => {
+      // 3 jurados
+      const juryScores: DanceJuryScore[] = [
+        { coreografia: 80, vestimenta: 80, entusiasmo: 80 }, // 80
+        { coreografia: 60, vestimenta: 60, entusiasmo: 60 }, // 60
+        { coreografia: 10, vestimenta: 10, entusiasmo: 10 }, // 10
+      ];
+      // Penalización = 20 puntos
+      const penalties: PenaltySummary = {
+        yellowFlags: 0,
+        redFlags: 2, // 20 pts
+        orderViolation: false,
+        manualDeductions: 0,
+      };
+
+      // AFTER_AVERAGE: promedio = (80 + 60 + 10) / 3 = 50. Final = 50 - 20 = 30.
+      const afterResult = calculateDanceGroupFinalScore(juryScores, penalties, {
+        penaltyOrder: "AFTER_AVERAGE",
+      });
+      expect(afterResult.average).toBe(50);
+      expect(afterResult.finalScore).toBe(30);
+
+      // BEFORE_AVERAGE:
+      // Jurado 1: max(80 - 20, 0) = 60
+      // Jurado 2: max(60 - 20, 0) = 40
+      // Jurado 3: max(10 - 20, 0) = 0 (acotado en 0)
+      // Promedio de notas penalizadas = (60 + 40 + 0) / 3 = 33.33
+      const beforeResult = calculateDanceGroupFinalScore(juryScores, penalties, {
+        penaltyOrder: "BEFORE_AVERAGE",
+      });
+      expect(beforeResult.average).toBe(50);
+      expect(beforeResult.finalScore).toBe(33.33);
     });
 
     it("calcula promedio recortado correctamente (descarta nota máxima y mínima)", () => {
@@ -217,5 +251,23 @@ describe("Módulo B: Fórmula de cálculo para Candidatas (Moperita y Ñusta)", 
     expect(result.runwayScores.find((r) => r.runwayType === "CASUAL")?.runwayAverage).toBe(80);
     expect(result.runwayScores.find((r) => r.runwayType === "TIPICA")?.runwayAverage).toBe(95);
     expect(result.totalScore).toBeCloseTo(88.33, 1);
+  });
+
+  it("calcula la nota final con ponderaciones personalizadas de pasarelas (ej: 40% Gala, 30% Casual, 30% Típica)", () => {
+    const customWeights = [
+      { type: "GALA" as const, weight: 0.40 },
+      { type: "CASUAL" as const, weight: 0.30 },
+      { type: "TIPICA" as const, weight: 0.30 },
+    ];
+
+    const runwayJuryScores = {
+      GALA: [100, 100],   // Promedio: 100 * 0.40 = 40
+      CASUAL: [80, 80],   // Promedio: 80 * 0.30 = 24
+      TIPICA: [90, 90],   // Promedio: 90 * 0.30 = 27
+    };
+
+    const result = calculateCandidateFinalScore(runwayJuryScores, customWeights);
+    // 40 + 24 + 27 = 91.00
+    expect(result.totalScore).toBe(91);
   });
 });

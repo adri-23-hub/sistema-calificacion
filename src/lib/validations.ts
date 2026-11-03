@@ -183,15 +183,6 @@ export const participantSchema = z.object({
 
 export type ParticipantInput = z.infer<typeof participantSchema>;
 
-// ─── Apertura oficial ───────────────────────────────────────
-
-export const officialOpeningConfirmSchema = z.object({
-  editionId: z.string().min(1),
-  confirmationType: z.enum(["admin", "notary"]),
-});
-
-export type OfficialOpeningInput = z.infer<typeof officialOpeningConfirmSchema>;
-
 // ─── Registro de llegada (CONTROL) ──────────────────────────
 
 export const arrivalRegistrationSchema = z.object({

@@ -63,13 +63,6 @@ enum ScoringRule {
   TRIMMED_MEAN // promedio recortado (descarta max y min)
 }
 
-enum LiveVisibility {
-  ALWAYS
-  AFTER_ENTRY
-  AFTER_CATEGORY
-  HIDDEN
-}
-
 enum ChainScope {
   SCORE
   AUDIT
@@ -105,15 +98,9 @@ model Edition {
   status               EditionStatus  @default(DRAFT)
   scoringRule           ScoringRule    @default(MEAN)
   quorum               Float          @default(1.0) // 1.0 = 100%
-  publicLiveVisibility  LiveVisibility @default(HIDDEN) // "sobre cerrado" por defecto
   tieBreakOrder        String?        // JSON array de criterios para desempate
   decimals             Int            @default(2) // decimales de redondeo
   autoDisqualify       Boolean        @default(false) // ¿descalificación automática?
-  resultsRevealed      Boolean        @default(false) // ¿resultados revelados?
-  adminConfirmedAt     DateTime?      // primera confirmación (ADMIN)
-  adminConfirmedBy     String?        // userId del ADMIN que confirmó
-  notaryConfirmedAt    DateTime?      // segunda confirmación (NOTARIO)
-  notaryConfirmedBy    String?        // userId del NOTARIO que confirmó
   startsAt             DateTime?
   endsAt               DateTime?
   createdAt            DateTime       @default(now())

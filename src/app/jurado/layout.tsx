@@ -55,15 +55,36 @@ export default async function JuradoLayout({
                 href="/jurado"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-display font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
               >
+                <span className="ms text-lg text-tertiary">grid_view</span>
+                Menú
+              </Link>
+              <Link
+                href="/jurado/danzas"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-display font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+              >
                 <span className="ms text-lg text-tertiary">format_list_bulleted</span>
                 Danzas
+              </Link>
+              <Link
+                href="/jurado/calificar"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-display font-semibold text-tertiary bg-tertiary/10 border border-tertiary/30 hover:bg-tertiary/20 transition-colors shadow-sm"
+              >
+                <span className="ms text-lg text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>how_to_vote</span>
+                Emitir Voto
               </Link>
               <Link
                 href="/jurado/mis-calificaciones"
                 className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-display font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
               >
-                <span className="ms text-lg text-secondary">dashboard</span>
-                Mis Calificaciones
+                <span className="ms text-lg text-secondary">fact_check</span>
+                Mis Votos
+              </Link>
+              <Link
+                href="/jurado/credencial"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-display font-semibold text-on-surface hover:bg-surface-container-high transition-colors"
+              >
+                <span className="ms text-lg text-primary">badge</span>
+                Mi Mesa
               </Link>
             </div>
           </div>
@@ -87,21 +108,42 @@ export default async function JuradoLayout({
       </nav>
 
       {/* Mobile Navigation */}
-      <div className="sm:hidden fixed bottom-0 inset-x-0 glass-strong border-t border-outline-variant/20 z-50 px-4 py-2">
+      <div className="sm:hidden fixed bottom-0 inset-x-0 glass-strong border-t border-outline-variant/20 z-50 px-2 py-2">
         <div className="flex items-center justify-around">
           <Link
             href="/jurado"
-            className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
+          >
+            <span className="ms text-xl text-tertiary">grid_view</span>
+            <span className="text-[10px] font-display font-semibold">Menú</span>
+          </Link>
+          <Link
+            href="/jurado/danzas"
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
           >
             <span className="ms text-xl text-tertiary">format_list_bulleted</span>
-            <span className="text-xs font-display font-semibold">Danzas</span>
+            <span className="text-[10px] font-display font-semibold">Danzas</span>
+          </Link>
+          <Link
+            href="/jurado/calificar"
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-tertiary bg-tertiary/15 border border-tertiary/30 shadow-sm"
+          >
+            <span className="ms text-xl text-tertiary" style={{ fontVariationSettings: "'FILL' 1" }}>how_to_vote</span>
+            <span className="text-[10px] font-display font-extrabold">Votar</span>
           </Link>
           <Link
             href="/jurado/mis-calificaciones"
-            className="flex flex-col items-center gap-0.5 px-4 py-1.5 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
           >
-            <span className="ms text-xl text-secondary">dashboard</span>
-            <span className="text-xs font-display font-semibold">Mis Votos</span>
+            <span className="ms text-xl text-secondary">fact_check</span>
+            <span className="text-[10px] font-display font-semibold">Mis Votos</span>
+          </Link>
+          <Link
+            href="/jurado/credencial"
+            className="flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
+          >
+            <span className="ms text-xl text-primary">badge</span>
+            <span className="text-[10px] font-display font-semibold">Mi Mesa</span>
           </Link>
         </div>
       </div>

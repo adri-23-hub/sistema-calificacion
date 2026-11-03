@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import NotariaClient, {
-  type NotaryEditionData,
   type NotaryVotingStatusItem,
   type NotaryAuditItem,
 } from "@/features/notaria/NotariaClient";
@@ -52,7 +51,7 @@ export default async function NotariaPage() {
     },
   });
 
-  // Mapeo a progreso de votación (sin devolver notas si resultsRevealed es false)
+  // Progreso de votación: solo cantidades y estados, nunca notas individuales.
   const votingProgress: NotaryVotingStatusItem[] = [
     ...dbGroups.map((g) => ({
       id: g.id,
@@ -61,7 +60,6 @@ export default async function NotariaPage() {
       fraternityName: g.fraternity.name,
       votesCount: g.danceScores.length,
       status: g.isDisqualified ? "DESCALIFICADO" : g.status,
-      scoreStatusText: edition.resultsRevealed ? "DISPONIBLE" : "SOBRE CERRADO",
     })),
     ...dbCandidates.map((c) => ({
       id: c.id,
@@ -70,7 +68,6 @@ export default async function NotariaPage() {
       fraternityName: c.fraternity.name,
       votesCount: c.entries.reduce((sum, e) => sum + e.scores.length, 0),
       status: c.isActive ? "ACTIVO" : "INACTIVO",
-      scoreStatusText: edition.resultsRevealed ? "DISPONIBLE" : "SOBRE CERRADO",
     })),
   ];
 
@@ -91,20 +88,10 @@ export default async function NotariaPage() {
     metadata: a.metadata,
   }));
 
-  const editionData: NotaryEditionData = {
-    id: edition.id,
-    name: edition.name,
-    year: edition.year,
-    adminConfirmedAt: edition.adminConfirmedAt?.toISOString() || null,
-    notaryConfirmedAt: edition.notaryConfirmedAt?.toISOString() || null,
-    resultsRevealed: edition.resultsRevealed,
-  };
-
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <NotariaClient
         notaryName={session.name}
-        edition={editionData}
         votingProgress={votingProgress}
         auditLogs={auditLogs}
       />

@@ -1,15 +1,31 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { calculateDanceGroupFinalScore, type PenaltySummary } from "@/lib/scoring";
+import {
+  calculateDanceGroupFinalScore,
+  calculateCandidateFinalScore,
+  type PenaltySummary,
+  type RunwayWeight,
+} from "@/lib/scoring";
+import { readModuleAConfig } from "@/lib/live-results";
+import { rankCandidateItems } from "@/lib/live-ranking";
 import AdminPortalClient, {
   type AdminEditionData,
   type AdminGroupItem,
   type AdminCandidateItem,
   type AdminAuditItem,
+  type AdminConfigData,
 } from "@/features/admin/AdminPortalClient";
 
 export const dynamic = "force-dynamic";
+
+function readNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
 
 export default async function AdminPage() {
   const session = await getSession();
@@ -31,7 +47,88 @@ export default async function AdminPage() {
     );
   }
 
-  // 2. Obtener grupos de danza con votos y penalizaciones
+  // 2. Obtener todas las configuraciones de la edición
+  const dbConfigs = await prisma.eventConfig.findMany({
+    where: { editionId: edition.id },
+    select: { key: true, value: true },
+  });
+
+  const configMap = new Map<string, unknown>(dbConfigs.map((c) => [c.key, c.value]));
+
+  // Configuración Módulo A
+  const moduleAConfig = readModuleAConfig(
+    dbConfigs,
+    edition.scoringRule as "MEAN" | "TRIMMED_MEAN"
+  );
+
+  // Parámetros generales
+  const configuredDecimals = readNumber(configMap.get("general.decimals"));
+  const activeDecimals =
+    configuredDecimals !== null
+      ? Math.min(4, Math.max(0, configuredDecimals))
+      : edition.decimals;
+
+  const configuredScoringRule = configMap.get("general.scoringRule");
+  const activeScoringRule: "MEAN" | "TRIMMED_MEAN" =
+    configuredScoringRule === "TRIMMED_MEAN" || configuredScoringRule === "MEAN"
+      ? (configuredScoringRule as "MEAN" | "TRIMMED_MEAN")
+      : (edition.scoringRule as "MEAN" | "TRIMMED_MEAN");
+
+  const penaltyOrderVal = configMap.get("moduleA.penalty.order");
+  const activePenaltyOrder: "BEFORE_AVERAGE" | "AFTER_AVERAGE" =
+    penaltyOrderVal === "BEFORE_AVERAGE" ? "BEFORE_AVERAGE" : "AFTER_AVERAGE";
+
+  // Pesos de pasarelas Módulo B
+  const runwayWeightsVal = configMap.get("moduleB.runway.weights");
+  let galaW = 34;
+  let casualW = 33;
+  let tipicaW = 33;
+  if (isRecord(runwayWeightsVal)) {
+    const g = readNumber(runwayWeightsVal.GALA);
+    const c = readNumber(runwayWeightsVal.CASUAL);
+    const t = readNumber(runwayWeightsVal.TIPICA);
+    if (g !== null && c !== null && t !== null) {
+      galaW = g > 1.5 ? Math.round(g) : Math.round(g * 100);
+      casualW = c > 1.5 ? Math.round(c) : Math.round(c * 100);
+      tipicaW = t > 1.5 ? Math.round(t) : Math.round(t * 100);
+    }
+  }
+
+  // Pesos de 4 criterios Módulo B
+  const criteriaWeightsVal = configMap.get("moduleB.criteria.weights");
+  let porteW = 25;
+  let carismaW = 25;
+  let autenticidadW = 25;
+  let originalidadW = 25;
+  if (isRecord(criteriaWeightsVal)) {
+    const p = readNumber(criteriaWeightsVal.porteElegancia);
+    const c = readNumber(criteriaWeightsVal.carismaSimpatia);
+    const a = readNumber(criteriaWeightsVal.autenticidadTraje);
+    const o = readNumber(criteriaWeightsVal.originalidadEstilo);
+    if (p !== null && c !== null && a !== null && o !== null) {
+      porteW = p > 1.5 ? Math.round(p) : Math.round(p * 100);
+      carismaW = c > 1.5 ? Math.round(c) : Math.round(c * 100);
+      autenticidadW = a > 1.5 ? Math.round(a) : Math.round(a * 100);
+      originalidadW = o > 1.5 ? Math.round(o) : Math.round(o * 100);
+    }
+  }
+
+  // Jurados esperados
+  const juryCountVal = configMap.get("general.juryCount");
+  let jurorsModA = 5;
+  let jurorsModB = 5;
+  if (isRecord(juryCountVal)) {
+    jurorsModA = readNumber(juryCountVal.moduleA) ?? 5;
+    jurorsModB = readNumber(juryCountVal.moduleB) ?? 5;
+  }
+
+  // Criterio de desempate
+  const tieBreakVal = configMap.get("general.tieBreak");
+  const tieBreakOrder = Array.isArray(tieBreakVal)
+    ? tieBreakVal.map(String)
+    : ["coreografia", "vestimenta", "entusiasmo"];
+
+  // 3. Obtener grupos de danza con votos y penalizaciones
   const dbGroups = await prisma.danceGroup.findMany({
     where: { editionId: edition.id },
     include: {
@@ -42,10 +139,7 @@ export default async function AdminPage() {
     orderBy: [{ entryOrder: "asc" }, { createdAt: "asc" }],
   });
 
-  // 3. Verificar si existen votos
-  const hasSubmittedVotes = dbGroups.some((g) => g.danceScores.length > 0);
-
-  // 4. Calcular resultados por grupo
+  // 4. Calcular resultados por grupo de danza (Concurso B)
   const groups: AdminGroupItem[] = dbGroups.map((g) => {
     const penaltySummary: PenaltySummary = {
       yellowFlags: g.penalties.filter((p) => !p.isVoided && p.type === "YELLOW_FLAG").length,
@@ -63,8 +157,10 @@ export default async function AdminPage() {
     }));
 
     const result = calculateDanceGroupFinalScore(juryScores, penaltySummary, {
-      scoringRule: edition.scoringRule,
-      decimals: edition.decimals,
+      weights: moduleAConfig.weights,
+      scoringRule: activeScoringRule,
+      decimals: activeDecimals,
+      penaltyOrder: activePenaltyOrder,
     });
 
     return {
@@ -75,7 +171,7 @@ export default async function AdminPage() {
       university: g.fraternity.university,
       department: g.fraternity.department,
       numberOfDancers: g.numberOfDancers,
-      status: g.status,
+      status: g.status as "PENDING" | "IN_SCORING" | "CLOSED",
       isDisqualified: g.isDisqualified,
       disqualifyReason: g.disqualifyReason,
       arrivalTime: g.arrivalTime?.toISOString() || null,
@@ -95,46 +191,136 @@ export default async function AdminPage() {
     };
   });
 
-  // Ordenar por nota final (ranking)
+  // Ordenar danzas por nota final (ranking)
   groups.sort((a, b) => {
     if (a.isDisqualified && !b.isDisqualified) return 1;
     if (!a.isDisqualified && b.isDisqualified) return -1;
     return (b.finalScore || 0) - (a.finalScore || 0);
   });
 
-  // 5. Candidatas
+  // 5. Candidatas (Concurso A: Moperita y Ñusta de Bolivia)
   const dbParticipants = await prisma.participant.findMany({
-    where: { category: { editionId: edition.id } },
+    where: { category: { editionId: edition.id }, isActive: true },
     include: {
       category: true,
       fraternity: true,
       entries: {
         include: {
-          scores: { where: { status: "SUBMITTED" } },
+          runway: true,
+          scores: {
+            where: { status: "SUBMITTED" },
+            include: { rubric: true },
+          },
         },
       },
     },
-    take: 20,
+    orderBy: { fullName: "asc" },
   });
 
-  const candidates: AdminCandidateItem[] = dbParticipants.map((p) => {
-    const totalVotes = p.entries.reduce((sum, e) => sum + e.scores.length, 0);
+  const runwayWeightsForCalc: RunwayWeight[] = [
+    { type: "GALA", weight: galaW / 100 },
+    { type: "CASUAL", weight: casualW / 100 },
+    { type: "TIPICA", weight: tipicaW / 100 },
+  ];
+
+  const rawCandidates: AdminCandidateItem[] = dbParticipants.map((p) => {
+    const runwayJuryScores: Record<string, number[]> = {
+      GALA: [],
+      CASUAL: [],
+      TIPICA: [],
+    };
+
+    let totalVotes = 0;
+
+    for (const entry of p.entries) {
+      const rwType = entry.runway?.type;
+      if (!rwType || !(rwType in runwayJuryScores)) continue;
+
+      for (const score of entry.scores) {
+        if (score.rawTotal === null) continue;
+        const maxPoints = score.rubric?.totalPoints || 40;
+        // Normalizado a 100
+        const normScore = Math.max(0, Math.min(100, (score.rawTotal / maxPoints) * 100));
+        runwayJuryScores[rwType].push(normScore);
+        totalVotes += 1;
+      }
+    }
+
+    const calcResult = calculateCandidateFinalScore(
+      runwayJuryScores,
+      runwayWeightsForCalc,
+      {
+        scoringRule: activeScoringRule,
+        decimals: activeDecimals,
+      }
+    );
+
+    const galaScore = calcResult.runwayScores.find((r) => r.runwayType === "GALA");
+    const casualScore = calcResult.runwayScores.find((r) => r.runwayType === "CASUAL");
+    const tipicaScore = calcResult.runwayScores.find((r) => r.runwayType === "TIPICA");
+
     return {
       id: p.id,
       fullName: p.fullName,
+      categoryId: p.categoryId,
       categoryName: p.category.name,
+      categorySlug: p.category.slug,
       fraternityName: p.fraternity.name,
       university: p.fraternity.university,
       photoUrl: p.photoUrl,
       votesCount: totalVotes,
+      galaAverage: galaScore?.runwayAverage,
+      casualAverage: casualScore?.runwayAverage,
+      tipicaAverage: tipicaScore?.runwayAverage,
+      totalScore: calcResult.totalScore,
+      rank: null,
     };
   });
 
-  // 6. Auditorías recientes
+  // Clasificar y rankear candidatas por categoría (Moperita y Ñusta por separado)
+  const moperitaCandidates = rawCandidates.filter((c) => c.categorySlug === "moperita");
+  const nustaCandidates = rawCandidates.filter((c) => c.categorySlug === "nusta");
+
+  const rankedMoperita = rankCandidateItems(
+    moperitaCandidates.map((c) => ({
+      ...c,
+      juryCount: jurorsModB,
+      runways: [],
+      lastVoteAt: null,
+      totalScore: c.totalScore || 0,
+      rank: c.rank ?? null,
+    }))
+  ).map((ranked) => ({
+    ...moperitaCandidates.find((c) => c.id === ranked.id)!,
+    rank: ranked.rank,
+  }));
+
+  const rankedNusta = rankCandidateItems(
+    nustaCandidates.map((c) => ({
+      ...c,
+      juryCount: jurorsModB,
+      runways: [],
+      lastVoteAt: null,
+      totalScore: c.totalScore || 0,
+      rank: c.rank ?? null,
+    }))
+  ).map((ranked) => ({
+    ...nustaCandidates.find((c) => c.id === ranked.id)!,
+    rank: ranked.rank,
+  }));
+
+  const allCandidates: AdminCandidateItem[] = [...rankedMoperita, ...rankedNusta];
+
+  // 6. Verificar si existen votos emitidos
+  const hasSubmittedVotes =
+    dbGroups.some((g) => g.danceScores.length > 0) ||
+    dbParticipants.some((p) => p.entries.some((e) => e.scores.length > 0));
+
+  // 7. Auditorías recientes
   const dbAudits = await prisma.auditLog.findMany({
     where: { editionId: edition.id },
     orderBy: { createdAt: "desc" },
-    take: 15,
+    take: 20,
   });
 
   const recentAudits: AdminAuditItem[] = dbAudits.map((a) => ({
@@ -149,11 +335,27 @@ export default async function AdminPage() {
     id: edition.id,
     name: edition.name,
     year: edition.year,
-    adminConfirmedAt: edition.adminConfirmedAt?.toISOString() || null,
-    notaryConfirmedAt: edition.notaryConfirmedAt?.toISOString() || null,
-    resultsRevealed: edition.resultsRevealed,
-    scoringRule: edition.scoringRule,
-    decimals: edition.decimals,
+    scoringRule: activeScoringRule,
+    decimals: activeDecimals,
+  };
+
+  const initialConfigs: AdminConfigData = {
+    coreografiaWeight: Math.round(moduleAConfig.weights.coreografia * 100),
+    vestimentaWeight: Math.round(moduleAConfig.weights.vestimenta * 100),
+    entusiasmoWeight: Math.round(moduleAConfig.weights.entusiasmo * 100),
+    penaltyOrder: activePenaltyOrder,
+    galaWeight: galaW,
+    casualWeight: casualW,
+    tipicaWeight: tipicaW,
+    porteWeight: porteW,
+    carismaWeight: carismaW,
+    autenticidadWeight: autenticidadW,
+    originalidadWeight: originalidadW,
+    scoringRule: activeScoringRule,
+    decimals: activeDecimals,
+    jurorsModuleA: jurorsModA,
+    jurorsModuleB: jurorsModB,
+    tieBreakOrder,
   };
 
   return (
@@ -162,9 +364,10 @@ export default async function AdminPage() {
         adminName={session.name}
         edition={editionData}
         groups={groups}
-        candidates={candidates}
+        candidates={allCandidates}
         recentAudits={recentAudits}
         hasSubmittedVotes={hasSubmittedVotes}
+        initialConfigs={initialConfigs}
       />
     </div>
   );

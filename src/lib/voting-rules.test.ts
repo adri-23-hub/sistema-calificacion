@@ -1,12 +1,19 @@
 import { describe, it, expect } from "vitest";
 
-describe("Reglas de Votación y Apertura Oficial", () => {
+describe("Reglas de Votación", () => {
   describe("Regla de Voto Único por Jurado", () => {
     it("simula bloqueo atómico de doble voto concurrente (idempotencia y validación previa)", async () => {
       // Simulación del almacén de base de datos en memoria para representar la transacción
-      const votesDB = new Map<string, { id: string; juryId: string; danceGroupId: string; status: string }>();
+      const votesDB = new Map<
+        string,
+        { id: string; juryId: string; danceGroupId: string; status: string }
+      >();
 
-      async function submitVoteSimulation(vote: { juryId: string; danceGroupId: string; clientUuid: string }) {
+      async function submitVoteSimulation(vote: {
+        juryId: string;
+        danceGroupId: string;
+        clientUuid: string;
+      }) {
         const key = `${vote.danceGroupId}-${vote.juryId}`;
 
         // Chequeo de voto existente
@@ -50,78 +57,6 @@ describe("Reglas de Votación y Apertura Oficial", () => {
         clientUuid: "uuid-vote-3",
       });
       expect(vote2.status).toBe("SUBMITTED");
-    });
-  });
-
-  describe("Apertura oficial con doble confirmación (ADMIN + NOTARIO)", () => {
-    it("los resultados se revelan ÚNICAMENTE cuando ambos han confirmado", () => {
-      interface EditionState {
-        adminConfirmedAt: Date | null;
-        notaryConfirmedAt: Date | null;
-        resultsRevealed: boolean;
-      }
-
-      function confirmAdmin(edition: EditionState): EditionState {
-        if (edition.adminConfirmedAt) throw new Error("Ya confirmado por ADMIN");
-        const adminConfirmedAt = new Date();
-        const resultsRevealed = edition.notaryConfirmedAt !== null;
-        return { ...edition, adminConfirmedAt, resultsRevealed };
-      }
-
-      function confirmNotary(edition: EditionState): EditionState {
-        if (edition.notaryConfirmedAt) throw new Error("Ya confirmado por NOTARIO");
-        const notaryConfirmedAt = new Date();
-        const resultsRevealed = edition.adminConfirmedAt !== null;
-        return { ...edition, notaryConfirmedAt, resultsRevealed };
-      }
-
-      // Estado inicial
-      let state: EditionState = {
-        adminConfirmedAt: null,
-        notaryConfirmedAt: null,
-        resultsRevealed: false,
-      };
-
-      // 1. Confirma solo ADMIN -> los resultados permanecen bloqueados (sobre cerrado)
-      state = confirmAdmin(state);
-      expect(state.adminConfirmedAt).not.toBeNull();
-      expect(state.notaryConfirmedAt).toBeNull();
-      expect(state.resultsRevealed).toBe(false);
-
-      // 2. Confirma NOTARIO -> ahora ambos confirmaron, resultados revelados
-      state = confirmNotary(state);
-      expect(state.notaryConfirmedAt).not.toBeNull();
-      expect(state.resultsRevealed).toBe(true);
-    });
-
-    it("funciona en orden inverso (primero NOTARIO, luego ADMIN)", () => {
-      interface EditionState {
-        adminConfirmedAt: Date | null;
-        notaryConfirmedAt: Date | null;
-        resultsRevealed: boolean;
-      }
-
-      function confirmAdmin(edition: EditionState): EditionState {
-        return { ...edition, adminConfirmedAt: new Date(), resultsRevealed: edition.notaryConfirmedAt !== null };
-      }
-
-      function confirmNotary(edition: EditionState): EditionState {
-        return { ...edition, notaryConfirmedAt: new Date(), resultsRevealed: edition.adminConfirmedAt !== null };
-      }
-
-      let state: EditionState = {
-        adminConfirmedAt: null,
-        notaryConfirmedAt: null,
-        resultsRevealed: false,
-      };
-
-      // 1. Confirma NOTARIO primero
-      state = confirmNotary(state);
-      expect(state.resultsRevealed).toBe(false);
-
-      // 2. Confirma ADMIN después -> se revelan
-      state = confirmAdmin(state);
-      expect(state.resultsRevealed).toBe(true);
     });
   });
 });

@@ -95,8 +95,15 @@ export default function MyScoresClient({
             href="/jurado"
             className="px-3.5 py-2 rounded-lg bg-surface-container-high border border-outline-variant/60 text-on-surface hover:bg-surface-container-highest font-label-md text-label-md flex items-center gap-1.5 transition-colors font-semibold shadow-sm"
           >
+            <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            <span>Volver al Menú</span>
+          </Link>
+          <Link
+            href="/jurado/danzas"
+            className="px-3.5 py-2 rounded-lg bg-surface-container-high border border-outline-variant/60 text-on-surface hover:bg-surface-container-highest font-label-md text-label-md flex items-center gap-1.5 transition-colors font-semibold shadow-sm"
+          >
             <span className="material-symbols-outlined text-[18px]">format_list_bulleted</span>
-            <span>Ver Catálogo</span>
+            <span>Danzas</span>
           </Link>
         </div>
       </div>

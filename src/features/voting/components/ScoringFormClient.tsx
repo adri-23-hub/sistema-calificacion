@@ -173,7 +173,7 @@ export default function ScoringFormClient({
             className="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface text-label-md font-label-md transition-all shadow-sm border border-outline-variant/30"
           >
             <span className="material-symbols-outlined text-base text-primary">arrow_back</span>
-            <span>Volver al Catálogo</span>
+            <span>Volver al Menú</span>
           </Link>
           <div className="inline-flex items-center gap-space-xs px-space-md py-space-xs rounded-full bg-surface-container-low text-on-surface-variant text-label-sm font-label-sm border border-outline-variant/30">
             <span className="material-symbols-outlined text-tertiary text-sm">how_to_reg</span>
@@ -371,7 +371,7 @@ export default function ScoringFormClient({
                   </div>
                   <div className="flex items-center gap-2">
                     <Link
-                      href="/jurado"
+                      href="/jurado/danzas"
                       className="px-space-md py-space-xs rounded-xl bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-md text-label-md flex items-center gap-2 transition-all shadow-md border border-outline-variant/30"
                     >
                       <span className="material-symbols-outlined text-base">format_list_bulleted</span>
