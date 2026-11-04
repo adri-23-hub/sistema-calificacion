@@ -18,6 +18,7 @@ import AdminPortalClient, {
   type AdminConfigData,
 } from "@/features/admin/AdminPortalClient";
 import type { AdminFraternityOption } from "@/features/admin/components/DanceRegistrationModal";
+import type { CandidateCategoryOption } from "@/features/admin/candidate-types";
 
 export const dynamic = "force-dynamic";
 
@@ -223,6 +224,16 @@ export default async function AdminPage() {
   });
 
   // 5. Candidatas (Concurso A: Moperita y Ñusta de Bolivia)
+  const dbCandidateCategories = await prisma.category.findMany({
+    where: { editionId: edition.id, moduleType: "MOPERITA_NUSTA", slug: { in: ["moperita", "nusta"] } },
+    select: { id: true, name: true, slug: true, status: true, runways: { select: { type: true } }, participants: { select: { fraternityId: true } } },
+    orderBy: { order: "asc" },
+  });
+  const candidateCategories: CandidateCategoryOption[] = dbCandidateCategories.map((category) => ({
+    id: category.id, name: category.name, slug: category.slug, status: category.status,
+    hasRunways: ["GALA", "CASUAL", "TIPICA"].every((type) => category.runways.some((runway) => runway.type === type)),
+    occupiedFraternityIds: category.participants.map((participant) => participant.fraternityId),
+  }));
   const dbParticipants = await prisma.participant.findMany({
     where: { category: { editionId: edition.id }, isActive: true },
     include: {
@@ -289,6 +300,8 @@ export default async function AdminPage() {
       categoryId: p.categoryId,
       categoryName: p.category.name,
       categorySlug: p.category.slug,
+      fraternityId: p.fraternityId,
+      career: p.career,
       fraternityName: p.fraternity.name,
       university: p.fraternity.university,
       photoUrl: p.photoUrl,
@@ -390,6 +403,7 @@ export default async function AdminPage() {
         fraternities={fraternities}
         groups={groups}
         candidates={allCandidates}
+        candidateCategories={candidateCategories}
         recentAudits={recentAudits}
         hasSubmittedVotes={hasSubmittedVotes}
         initialConfigs={initialConfigs}

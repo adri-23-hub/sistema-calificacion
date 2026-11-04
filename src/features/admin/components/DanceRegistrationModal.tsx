@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import PhotoUpload from "@/features/admin/components/PhotoUpload";
+import FraternityFields from "./FraternityFields";
 import {
   createDanceGroupAction,
   updateDanceGroupAction,
@@ -290,64 +291,8 @@ export default function DanceRegistrationModal({
               })}
             </select>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
-              <div>
-                <label className={labelCls}>Nombre de la fraternidad *</label>
-                <input
-                  className={inputCls}
-                  value={newFratForm.name}
-                  onChange={(e) => setNewFratForm((p) => ({ ...p, name: e.target.value }))}
-                  placeholder="Fraternidad …"
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Universidad *</label>
-                <input
-                  className={inputCls}
-                  value={newFratForm.university}
-                  onChange={(e) => setNewFratForm((p) => ({ ...p, university: e.target.value }))}
-                  placeholder="UMSA, UMSS, …"
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Facultad / carrera</label>
-                <input
-                  className={inputCls}
-                  value={newFratForm.faculty}
-                  onChange={(e) => setNewFratForm((p) => ({ ...p, faculty: e.target.value }))}
-                  placeholder="Opcional"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Ciudad *</label>
-                  <input
-                    className={inputCls}
-                    value={newFratForm.city}
-                    onChange={(e) => setNewFratForm((p) => ({ ...p, city: e.target.value }))}
-                    placeholder="La Paz"
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Departamento *</label>
-                  <input
-                    className={inputCls}
-                    value={newFratForm.department}
-                    onChange={(e) => setNewFratForm((p) => ({ ...p, department: e.target.value }))}
-                    placeholder="La Paz"
-                  />
-                </div>
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Logo / escudo (se comprime automáticamente)</label>
-                <PhotoUpload
-                  value={newFratLogo}
-                  disabled={saving !== null}
-                  onBusyChange={setLogoBusy}
-                  onChange={(url) => setNewFratLogo(url)}
-                />
-              </div>
-            </div>
+            <FraternityFields value={newFratForm} onChange={setNewFratForm} logoUrl={newFratLogo} onLogoChange={setNewFratLogo}
+              disabled={saving !== null} onBusyChange={setLogoBusy} idPrefix="dance-fraternity" />
           )}
         </div>
 

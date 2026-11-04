@@ -214,11 +214,13 @@ export function isStoredImageUrl(url: unknown): url is string {
 // ─── Candidata ──────────────────────────────────────────────
 
 export const participantSchema = z.object({
+  editionId: z.string().min(1).optional(),
   categoryId: z.string().min(1),
   fraternityId: z.string().min(1),
-  fullName: z.string().min(1, "Nombre completo requerido").max(200),
-  career: z.string().max(200).optional(),
-  bio: z.string().max(1000).optional(),
+  fullName: z.string().trim().min(1, "Nombre completo requerido").max(200),
+  career: z.string().trim().max(200).optional(),
+  bio: z.string().trim().max(1000).optional(),
+  photoUrl: participantPhotoSchema.shape.photoUrl.optional(),
   isAdult: z.boolean().optional(),
   hasMatricula: z.boolean().optional(),
 });

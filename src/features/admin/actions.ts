@@ -11,7 +11,9 @@ import {
   danceGroupSchema,
   fraternitySchema,
   participantPhotoSchema,
+  participantSchema,
 } from "@/lib/validations";
+import type { RegisteredCandidate } from "@/features/admin/candidate-types";
 
 // ─── Guardar configuración del evento (ADMIN) ───────────────
 
@@ -625,6 +627,89 @@ export async function updateDanceGroupAction(
 }
 
 // ─── Foto de candidata Moperita/Ñusta (ADMIN) ───────────────
+
+export async function createParticipantAction(
+  input: unknown
+): Promise<{ success: boolean; error?: string; candidate?: RegisteredCandidate }> {
+  try {
+    const session = await requireSession(["ADMIN"]);
+    requirePermission(session.role, "participants:write");
+    const parsed = participantSchema.safeParse(input);
+    if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message || "Datos inválidos" };
+    const data = parsed.data;
+    await requireStoredImage(data.photoUrl);
+
+    // SERIALIZABLE protege la asignación de turnos ante dos inscripciones simultáneas.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const candidate = await prisma.$transaction(async (tx) => {
+          const edition = await requireActiveEdition(data.editionId, tx);
+          const category = await tx.category.findUnique({
+            where: { id: data.categoryId },
+            include: { runways: { orderBy: { order: "asc" } } },
+          });
+          if (!category || category.editionId !== edition.id || category.moduleType !== "MOPERITA_NUSTA" || !["moperita", "nusta"].includes(category.slug)) {
+            throw new Error("Selecciona una categoría Moperita o Ñusta de la edición activa.");
+          }
+          if (category.status === "CLOSED") throw new Error("La categoría está cerrada y no admite nuevas candidatas.");
+          const runways = ["GALA", "CASUAL", "TIPICA"].map((type) => category.runways.find((r) => r.type === type));
+          if (runways.some((r) => !r)) throw new Error("Configura las pasadas de Gala, Casual y Típica de esta categoría antes de registrar candidatas.");
+
+          const fraternity = await tx.fraternity.findUnique({ where: { id: data.fraternityId } });
+          if (!fraternity || fraternity.editionId !== edition.id) throw new Error("La fraternidad no pertenece a la edición activa.");
+          const duplicate = await tx.participant.findUnique({
+            where: { categoryId_fraternityId: { categoryId: category.id, fraternityId: fraternity.id } },
+            select: { id: true },
+          });
+          if (duplicate) throw new Error(`Esta fraternidad ya tiene una candidata registrada en ${category.name}.`);
+
+          const lastEntry = await tx.entry.aggregate({ where: { categoryId: category.id }, _max: { order: true } });
+          const firstOrder = (lastEntry._max.order ?? 0) + 1;
+          const participant = await tx.participant.create({
+            data: {
+              categoryId: category.id, fraternityId: fraternity.id, fullName: data.fullName,
+              career: data.career || null, bio: data.bio || null, photoUrl: data.photoUrl ?? null,
+              isAdult: data.isAdult ?? false, hasMatricula: data.hasMatricula ?? false, isActive: true,
+              entries: {
+                create: runways.map((runway, index) => ({
+                  categoryId: category.id, runwayId: runway!.id, order: firstOrder + index, status: "PENDING",
+                })),
+              },
+            },
+          });
+          await tx.auditLog.create({ data: {
+            editionId: edition.id, actorId: session.userId, type: "PARTICIPANT_CREATED", entityType: "Participant", entityId: participant.id,
+            metadata: { fullName: participant.fullName, categoryId: category.id, categoryName: category.name, fraternityId: fraternity.id,
+              photoUrl: participant.photoUrl, runways: runways.map((r) => r!.type), firstOrder },
+          } });
+          return {
+            id: participant.id, fullName: participant.fullName, categoryId: category.id, categoryName: category.name, categorySlug: category.slug,
+            fraternityId: fraternity.id, fraternityName: fraternity.name, university: fraternity.university, photoUrl: participant.photoUrl, career: participant.career,
+          };
+        }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+        revalidatePath("/admin");
+        revalidatePath("/jurado", "layout");
+        revalidatePath("/notaria");
+        revalidatePath("/resultados");
+        revalidatePath("/vivo");
+        return { success: true, candidate };
+      } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+          if (attempt < 2) continue;
+          return { success: false, error: "Otra inscripción se está guardando al mismo tiempo. Intenta nuevamente." };
+        }
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+          return { success: false, error: "Esta fraternidad ya tiene una candidata registrada en la categoría seleccionada." };
+        }
+        throw error;
+      }
+    }
+    return { success: false, error: "No se pudo completar la inscripción. Intenta nuevamente." };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : "No se pudo registrar la candidata." };
+  }
+}
 
 export async function setParticipantPhotoAction(
   input: unknown

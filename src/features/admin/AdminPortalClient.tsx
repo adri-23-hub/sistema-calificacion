@@ -2,6 +2,9 @@
 
 import TableScroll from "@/components/TableScroll";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import CandidateRegistrationModal from "@/features/admin/components/CandidateRegistrationModal";
+import type { CandidateCategoryOption, RegisteredCandidate } from "./candidate-types";
 import PhotoUpload from "@/features/admin/components/PhotoUpload";
 import { useState, useTransition } from "react";
 import { saveAllEventConfigsAction, setParticipantPhotoAction } from "@/features/admin/actions";
@@ -63,6 +66,8 @@ export interface AdminCandidateItem {
   categoryId: string;
   categoryName: string;
   categorySlug: string; // "moperita" | "nusta"
+  fraternityId: string;
+  career?: string | null;
   fraternityName: string;
   university: string;
   photoUrl: string | null;
@@ -108,6 +113,7 @@ interface AdminPortalClientProps {
   fraternities: AdminFraternityOption[];
   groups: AdminGroupItem[];
   candidates: AdminCandidateItem[];
+  candidateCategories: CandidateCategoryOption[];
   recentAudits: AdminAuditItem[];
   hasSubmittedVotes: boolean;
   initialConfigs?: AdminConfigData;
@@ -119,16 +125,21 @@ export default function AdminPortalClient({
   fraternities: initialFraternities,
   groups: initialGroups,
   candidates: initialCandidates,
+  candidateCategories: initialCandidateCategories,
   recentAudits,
   hasSubmittedVotes,
   initialConfigs,
 }: AdminPortalClientProps) {
   const edition = initialEdition;
+  const router = useRouter();
+  const [candidateCategories, setCandidateCategories] = useState(initialCandidateCategories);
+  const [candidateModalOpen, setCandidateModalOpen] = useState(false);
+  const [candidateCategoryFilter, setCandidateCategoryFilter] = useState("all");
   const [candidates, setCandidates] = useState(initialCandidates);
   const [photoBusy, setPhotoBusy] = useState(false);
   const [groups, setGroups] = useState<AdminGroupItem[]>(initialGroups);
   const [fraternities, setFraternities] = useState<AdminFraternityOption[]>(initialFraternities);
-  const [activeTab, setActiveTab] = useState<"groups" | "penalties" | "config" | "results" | "audit">("groups");
+  const [activeTab, setActiveTab] = useState<"groups" | "candidates" | "penalties" | "config" | "results" | "audit">("groups");
   const [isPending, startTransition] = useTransition();
 
   // Modal de registro/edición de grupo de danza
@@ -193,6 +204,18 @@ export default function AdminPortalClient({
   });
 
   // Registrar/editar grupo de danza (modal)
+  const handleCandidateSaved = (candidate: RegisteredCandidate, updatedFraternities: AdminFraternityOption[]) => {
+    setCandidates((prev) => [...prev, { ...candidate, votesCount: 0, totalScore: 0, rank: null }]);
+    setFraternities(updatedFraternities);
+    setCandidateCategories((prev) => prev.map((category) => category.id === candidate.categoryId
+      ? { ...category, occupiedFraternityIds: [...category.occupiedFraternityIds, candidate.fraternityId] } : category));
+    setCandidateCategoryFilter(candidate.categoryId);
+    setCandidateModalOpen(false);
+    setActiveTab("candidates");
+    showFeedback("success", `${candidate.fullName} registrada en ${candidate.categoryName}, con sus tres pasadas.`);
+    router.refresh();
+  };
+
   const handleDanceSaved = (result: { group?: DanceGroupFormData & { id: string }; fraternities: AdminFraternityOption[] }) => {
     setFraternities(result.fraternities);
 
@@ -483,6 +506,7 @@ export default function AdminPortalClient({
       <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:flex lg:flex-wrap gap-2 border-b border-slate-800 pb-2">
         {[
           { id: "groups", label: `Grupos de Danza (${groups.length})` },
+          { id: "candidates", label: `Candidatas Moperita / Ñusta (${candidates.length})` },
           { id: "penalties", label: "Penalizaciones y Sanciones" },
           { id: "config", label: "⚙️ Parámetros Configurables (Reglamento)" },
           { id: "results", label: "🏆 Resultados y Rankings Oficiales" },
@@ -501,6 +525,46 @@ export default function AdminPortalClient({
           </button>
         ))}
       </div>
+
+      {activeTab === "candidates" && (
+        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap justify-between items-start gap-3">
+            <div><h2 className="text-lg font-bold text-white">Candidatas Moperita y Ñusta</h2>
+              <p className="text-xs text-slate-400 mt-1">Registro de representantes y fotografías para Gala, Casual y Típica.</p></div>
+            <button type="button" onClick={() => setCandidateModalOpen(true)} disabled={!candidateCategories.some((category) => category.status !== "CLOSED" && category.hasRunways)}
+              className="px-4 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50">+ Registrar candidata</button>
+          </div>
+          {!candidateCategories.some((category) => category.status !== "CLOSED" && category.hasRunways) && <p role="status" className="text-sm text-amber-300">No hay categorías abiertas con las tres pasadas configuradas para registrar candidatas.</p>}
+          <div className="flex flex-wrap gap-2" aria-label="Filtrar candidatas por categoría">
+            {[{ id: "all", name: "Todas" }, ...candidateCategories].map((category) => <button key={category.id} type="button" aria-pressed={candidateCategoryFilter === category.id}
+              onClick={() => setCandidateCategoryFilter(category.id)}
+              className={`px-3 py-2 rounded-xl text-xs font-semibold border ${candidateCategoryFilter === category.id ? "bg-indigo-600 border-indigo-500 text-white" : "bg-slate-950 border-slate-800 text-slate-300"}`}>
+              {category.name} ({candidates.filter((candidate) => category.id === "all" || candidate.categoryId === category.id).length})
+            </button>)}
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {candidates.filter((candidate) => candidateCategoryFilter === "all" || candidate.categoryId === candidateCategoryFilter).map((candidate) => (
+              <article key={candidate.id} className="min-w-0 rounded-xl border border-slate-800 bg-slate-950 p-4 flex flex-col gap-3">
+                <div className="flex gap-3 items-start">
+                  {candidate.photoUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={candidate.photoUrl} alt={candidate.fullName} className="w-16 h-20 rounded-lg object-cover shrink-0" />
+                  ) : <div className="w-16 h-20 rounded-lg bg-slate-800 flex items-center justify-center shrink-0" aria-label="Sin fotografía">📷</div>}
+                  <div className="min-w-0"><span className="text-xs text-indigo-300 font-semibold">{candidate.categoryName}</span>
+                    <h3 className="font-bold text-white break-words">{candidate.fullName}</h3>
+                    {candidate.career && <p className="text-xs text-slate-400">{candidate.career}</p>}</div>
+                </div>
+                <div className="text-xs text-slate-300"><p>{candidate.fraternityName}</p><p className="text-slate-400 mt-1">{candidate.university}</p></div>
+                <button type="button" className="mt-auto px-3 py-2 rounded-xl bg-slate-800 text-indigo-200 text-xs font-semibold"
+                  onClick={() => setCandidatePhotoModal({ isOpen: true, candidateId: candidate.id, candidateName: candidate.fullName, photoUrl: candidate.photoUrl })}>
+                  {candidate.photoUrl ? "Cambiar fotografía" : "Subir fotografía"}
+                </button>
+              </article>
+            ))}
+          </div>
+          {!candidates.some((candidate) => candidateCategoryFilter === "all" || candidate.categoryId === candidateCategoryFilter) && <p className="py-6 text-center text-sm text-slate-400">Todavía no hay candidatas registradas en esta categoría.</p>}
+        </section>
+      )}
 
       {/* TAB 1: GRUPOS DE DANZA */}
       {activeTab === "groups" && (
@@ -1411,6 +1475,10 @@ export default function AdminPortalClient({
           initial={danceModal.initial} onClose={() => setDanceModal({ isOpen: false, initial: null })}
           onSaved={handleDanceSaved} onFraternitiesChanged={setFraternities} />
       )}
+
+      {candidateModalOpen && <CandidateRegistrationModal editionId={edition.id} categories={candidateCategories} fraternities={fraternities}
+        initialCategoryId={candidateCategoryFilter === "all" ? undefined : candidateCategoryFilter}
+        onClose={() => setCandidateModalOpen(false)} onFraternitiesChanged={setFraternities} onSaved={handleCandidateSaved} />}
 
       {candidatePhotoModal.isOpen && (
         <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80" role="dialog" aria-modal="true" aria-label="Foto de candidata">
