@@ -600,21 +600,21 @@ export default function AdminPortalClient({
                         {group.votesCount}
                       </span>
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="p-3 text-center whitespace-nowrap">
                       {group.isDisqualified ? (
-                        <span className="px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
+                        <span className="inline-flex items-center justify-center whitespace-nowrap align-middle px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-400 border border-rose-500/20 font-bold">
                           DESCALIFICADO
                         </span>
                       ) : group.status === "IN_SCORING" ? (
-                        <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold animate-pulse">
+                        <span className="inline-flex items-center justify-center whitespace-nowrap align-middle px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20 font-bold animate-pulse">
                           EN PISTA
                         </span>
                       ) : group.status === "CLOSED" ? (
-                        <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
+                        <span className="inline-flex items-center justify-center whitespace-nowrap align-middle px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">
                           CERRADO
                         </span>
                       ) : (
-                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">
+                        <span className="inline-flex items-center justify-center whitespace-nowrap align-middle px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400">
                           PENDIENTE
                         </span>
                       )}
