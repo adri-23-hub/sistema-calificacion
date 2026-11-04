@@ -47,8 +47,8 @@ export default async function JuradoLayout({
         <div className="max-w-[1720px] mx-auto flex items-center justify-between gap-3">
           <div className="min-w-0 flex items-center gap-3 xl:gap-6">
             <Link href="/jurado" className="flex items-center gap-2 group">
-              <span className="text-gradient-gold font-display font-bold text-lg">
-                Moperita &amp; Ñusta
+              <span className="text-gradient-gold font-display font-bold text-[11px] sm:text-xs xl:text-sm leading-tight max-w-[13rem] sm:max-w-[20rem] xl:max-w-[24rem]">
+                SISTEMA DE CALIFICACIONES DE LA XIII ENTRADA FOLKLÓRICA UNIVERSITARIA NACIONAL TRINIDAD 2026
               </span>
             </Link>
             <JuradoNavDesktop />

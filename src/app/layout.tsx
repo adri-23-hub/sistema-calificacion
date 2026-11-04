@@ -9,7 +9,7 @@ const symbols = localFont({ src: "./fonts/material-symbols.woff2", variable: "--
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export const metadata: Metadata = {
-  title: "Sistema de Calificación — Moperita y Ñusta de Bolivia 2026",
+  title: "SISTEMA DE CALIFICACIONES DE LA XIII ENTRADA FOLKLÓRICA UNIVERSITARIA NACIONAL TRINIDAD 2026",
   description:
     "Sistema oficial de calificación y escrutinio del certamen Moperita y Ñusta de Bolivia 2026, XIII Entrada Folklórica Universitaria Nacional — Trinidad, Beni.",
 };

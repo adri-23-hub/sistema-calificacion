@@ -106,8 +106,9 @@ export default function LoginPage() {
               </div>
 
               {/* Title */}
-              <h1 className="font-headline-lg text-headline-lg text-primary-fixed tracking-tight font-extrabold">
-                Moperita &amp; Ñusta <span className="text-tertiary">2026</span>
+              <h1 className="font-headline-lg text-headline-lg text-primary-fixed tracking-tight font-extrabold text-balance">
+                SISTEMA DE CALIFICACIONES DE LA XIII ENTRADA FOLKLÓRICA UNIVERSITARIA NACIONAL
+                <span className="block text-tertiary mt-1">TRINIDAD 2026</span>
               </h1>
               <p className="font-label-md text-label-md text-on-surface-variant max-w-md mt-1 font-semibold">
                 Sistema de Calificación y Escrutinio Oficial de Jurados
