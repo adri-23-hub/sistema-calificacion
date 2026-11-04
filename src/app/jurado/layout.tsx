@@ -29,7 +29,7 @@ export default async function JuradoLayout({
           <span className="text-on-surface-variant tracking-wide font-medium">
             SISTEMA DE CALIFICACIÓN OFICIAL 2026 &nbsp;|&nbsp; XIII ENTRADA FOLKLÓRICA UNIVERSITARIA NACIONAL • TRINIDAD - BENI
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
             <span className="badge badge-gold">
               <span className="ms ms-filled text-xs">how_to_reg</span>
               JURADO
@@ -44,8 +44,8 @@ export default async function JuradoLayout({
 
       {/* Navigation */}
       <nav className="glass-strong border-b border-outline-variant/20 px-4 sm:px-8 xl:px-12 py-3">
-        <div className="max-w-[1720px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
+        <div className="max-w-[1720px] mx-auto flex items-center justify-between gap-3">
+          <div className="min-w-0 flex items-center gap-3 xl:gap-6">
             <Link href="/jurado" className="flex items-center gap-2 group">
               <span className="text-gradient-gold font-display font-bold text-lg">
                 Moperita &amp; Ñusta
@@ -55,7 +55,7 @@ export default async function JuradoLayout({
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex flex-col items-end text-xs">
+            <div className="hidden sm:flex max-w-48 flex-col items-end break-words text-right text-xs">
               <span className="text-on-surface font-display font-semibold">{session.name}</span>
               <span className="text-on-surface-variant">{session.code}</span>
             </div>
@@ -76,7 +76,7 @@ export default async function JuradoLayout({
       <JuradoNavMobile />
 
       {/* Content */}
-      <main className="flex-1 w-full max-w-[1720px] mx-auto px-4 sm:px-8 xl:px-12 py-6 pb-24 sm:pb-8">
+      <main className="jurado-content flex-1 w-full max-w-[1720px] mx-auto px-3 sm:px-6 xl:px-10 py-4 sm:py-6">
         {children}
       </main>
     </div>

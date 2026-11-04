@@ -7,8 +7,13 @@ const SECRET = new TextEncoder().encode(
 
 const PUBLIC_PATHS = ["/login", "/vivo", "/resultados", "/verificar", "/api/health", "/api/live"];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Lectura pública de fotografías; POST conserva la validación ADMIN en su ruta.
+  if ((request.method === "GET" || request.method === "HEAD") && /^\/api\/images\/[a-z0-9]{1,64}$/i.test(pathname)) {
+    return NextResponse.next();
+  }
 
   // Allow public paths
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p)) || pathname === "/") {

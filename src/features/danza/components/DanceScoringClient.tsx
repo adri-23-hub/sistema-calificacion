@@ -9,6 +9,7 @@ export interface DanceGroupDetail {
   id: string;
   entryOrder: number | null;
   danceName: string;
+  photoUrl: string | null;
   fraternityName: string;
   university: string;
   city: string;
@@ -38,8 +39,6 @@ interface DanceScoringClientProps {
 }
 
 export default function DanceScoringClient({
-  juryName,
-  juryCode,
   group,
 }: DanceScoringClientProps) {
   const router = useRouter();
@@ -128,6 +127,13 @@ export default function DanceScoringClient({
               </span>
             )}
           </div>
+        </div>
+
+        <div className="h-48 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center">
+          {group.photoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={group.photoUrl} alt={group.danceName} className="w-full h-full object-contain" />
+          ) : <span className="text-slate-500 text-sm">📷 Sin fotografía del grupo</span>}
         </div>
 
         {/* Detalles institucionales y checklist */}
@@ -320,8 +326,8 @@ export default function DanceScoringClient({
 
       {/* MODAL DE CONFIRMACIÓN DE VOTO ÚNICO */}
       {showConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="app-dialog-panel bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
             <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center text-2xl">
               ⚠️
             </div>

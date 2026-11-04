@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { registerPenaltyAction, registerArrivalAction, changeGroupStatusAction } from "@/features/danza/actions";
+import { registerPenaltyAction, registerArrivalAction } from "@/features/danza/actions";
 
 export interface DanceGroupControlItem {
   id: string;
@@ -189,7 +189,7 @@ export default function ControlPortalClient({
       {/* Header bar */}
       <header className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
               Personal de Control de Campo
             </span>
@@ -202,7 +202,7 @@ export default function ControlPortalClient({
             Registro en tiempo real de hora de llegada, orden de ingreso y banderolas de penalización.
           </p>
         </div>
-        <div className="text-right flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 sm:text-right">
           <div className="bg-slate-800/80 px-3.5 py-2 rounded-xl border border-slate-700/50">
             <div className="text-xs text-slate-400">Operador</div>
             <div className="text-sm font-semibold text-white">{userName}</div>
@@ -285,7 +285,7 @@ export default function ControlPortalClient({
       </div>
 
       {/* Lista de grupos */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredGroups.map((group) => {
           const activePenalties = group.penalties.filter((p) => !p.isVoided);
           const yellowCount = activePenalties.filter((p) => p.type === "YELLOW_FLAG").length;
@@ -327,9 +327,9 @@ export default function ControlPortalClient({
 
                 {/* Info institucional */}
                 <div className="space-y-1.5 text-xs text-slate-300 bg-slate-950/40 p-3 rounded-xl border border-slate-800/60 mb-4">
-                  <div className="flex justify-between">
+                  <div className="flex justify-between gap-3">
                     <span className="text-slate-400">Universidad:</span>
-                    <span className="font-medium text-slate-200 text-right truncate max-w-[200px]">
+                    <span className="min-w-0 font-medium text-slate-200 text-right break-words">
                       {group.university}
                     </span>
                   </div>
@@ -448,8 +448,8 @@ export default function ControlPortalClient({
 
       {/* Modal de confirmación de penalización */}
       {penaltyModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="app-dialog-panel bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-4 sm:p-6 shadow-2xl space-y-4">
             <div className="flex justify-between items-start">
               <div>
                 <span className="px-2.5 py-1 text-xs font-bold rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">

@@ -1,5 +1,6 @@
 "use client";
 
+import TableScroll from "@/components/TableScroll";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useLiveResults } from "@/features/live/useLiveResults";
@@ -133,7 +134,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur">
         <div className="max-w-[1600px] mx-auto px-4 sm:px-8 py-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <div className="w-14 h-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-3xl shrink-0">
               🏛️
             </div>
@@ -193,7 +194,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
 
       <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-8 py-6 space-y-6">
         {error && (
-          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300 flex items-center justify-between gap-3">
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs text-amber-300 flex flex-wrap items-center justify-between gap-3">
             <span>⚠️ {error}</span>
             <span className="text-amber-400/70">
               Última actualización: {formatTime(data.updatedAt)}
@@ -202,7 +203,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
         )}
 
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div className="inline-flex rounded-2xl bg-slate-900 border border-slate-800 p-1">
+          <div className="grid w-full grid-cols-1 min-[400px]:grid-cols-2 lg:w-auto rounded-2xl bg-slate-900 border border-slate-800 p-1">
             <button
               type="button"
               onClick={() => setActiveModule("A")}
@@ -264,7 +265,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
         )}
 
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
-          <section className="xl:col-span-8 bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl">
+          <section className="min-w-0 xl:col-span-8 bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-white">
@@ -288,7 +289,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            <TableScroll>
               {activeModule === "A" ? (
                 <table className="w-full min-w-[760px] text-left text-xs text-slate-300">
                   <thead className="text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-800">
@@ -361,7 +362,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
                   </tbody>
                 </table>
               )}
-            </div>
+            </TableScroll>
 
             {(activeModule === "A" ? topDance.length === 0 : topCandidates.length === 0) && (
               <div className="py-12 text-center">
@@ -381,7 +382,7 @@ export default function LiveResultsClient({ initialData }: LiveResultsClientProp
             </p>
           </section>
 
-          <aside className="xl:col-span-4 space-y-6">
+          <aside className="min-w-0 xl:col-span-4 space-y-6">
             <section className="bg-gradient-to-br from-amber-500/15 via-slate-900 to-slate-900 border border-amber-500/30 rounded-3xl p-5 shadow-2xl">
               <div className="flex items-center justify-between gap-2">
                 <span className="text-[10px] uppercase tracking-widest text-amber-400 font-black">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 
@@ -204,7 +205,7 @@ export default function JuryDancesClient({
                   </p>
                 </div>
 
-                <div className="bg-surface-container-lowest/80 p-space-sm rounded-lg flex items-center justify-between border border-outline-variant/30">
+                <div className="bg-surface-container-lowest/80 p-space-sm rounded-lg flex flex-wrap gap-3 items-center justify-between border border-outline-variant/30">
                   <div className="flex items-center gap-space-sm">
                     <span className="material-symbols-outlined text-tertiary text-headline-md">timer</span>
                     <div className="flex flex-col">
@@ -232,7 +233,7 @@ export default function JuryDancesClient({
           <div className="flex flex-col gap-space-sm bg-surface-container-low/70 p-space-md rounded-xl border border-outline-variant/20">
             {/* Category selection tabs */}
             <div className="flex flex-wrap items-center justify-between gap-space-sm border-b border-outline-variant/20 pb-space-sm">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex min-w-0 max-w-full items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
                 <span className="font-label-sm text-label-sm uppercase text-on-surface-variant font-bold mr-1">Categoría:</span>
                 <button
                   type="button"
@@ -356,7 +357,7 @@ export default function JuryDancesClient({
                   {/* Card Cover Header */}
                   <div className="relative w-full h-56 bg-surface-container-highest overflow-hidden">
                     {dance.photoUrl ? (
-                      <img
+                      <Image fill sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 33vw" unoptimized
                         src={dance.photoUrl}
                         alt={dance.danceName}
                         className="w-full h-full object-cover transition-transform duration-700 hover:scale-105"
@@ -489,7 +490,7 @@ export default function JuryDancesClient({
             <div className="bg-surface-container-low p-12 rounded-xl text-center flex flex-col items-center justify-center border border-outline-variant/20">
               <span className="material-symbols-outlined text-5xl text-outline mb-2">search_off</span>
               <p className="font-headline-sm text-on-surface font-bold">No se encontraron danzas</p>
-              <p className="font-body-sm text-on-surface-variant mt-1">Prueba cambiando los filtros o la búsqueda.</p>
+              <p className="font-body-sm text-on-surface-variant mt-1">{dances.length === 0 ? "Todavía no hay danzas ni candidatas registradas en la edición activa." : "Prueba cambiando los filtros o la búsqueda."}</p>
             </div>
           )}
         </div>

@@ -1,5 +1,12 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import "./globals.css";
+
+const outfit = localFont({ src: "./fonts/outfit.woff2", variable: "--font-outfit", weight: "400 800", display: "swap" });
+const jakarta = localFont({ src: "./fonts/plus-jakarta-sans.woff2", variable: "--font-jakarta", weight: "400 700", display: "swap" });
+const symbols = localFont({ src: "./fonts/material-symbols.woff2", variable: "--font-symbols", weight: "100 700", display: "block", preload: false });
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover" };
 
 export const metadata: Metadata = {
   title: "Sistema de Calificación — Moperita y Ñusta de Bolivia 2026",
@@ -13,19 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es" className="dark">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html lang="es" className={`dark ${outfit.variable} ${jakarta.variable} ${symbols.variable}`}>
       <body className="font-body antialiased min-h-screen bg-amazon-gradient text-on-surface">
         {children}
       </body>

@@ -1,10 +1,17 @@
 "use server";
 
+import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { requireActiveEdition } from "@/lib/active-edition";
 import { Prisma } from "@prisma/client";
 import { requirePermission } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
+import {
+  danceGroupSchema,
+  fraternitySchema,
+  participantPhotoSchema,
+} from "@/lib/validations";
 
 // ─── Guardar configuración del evento (ADMIN) ───────────────
 
@@ -351,3 +358,318 @@ export async function updateEventConfigAction(params: {
   return saveEventConfigAction(params.editionId, params.key, params.value, params.description);
 }
 
+// ─── Crear fraternidad (ADMIN) ──────────────────────────────
+
+async function requireStoredImage(url: string | null | undefined) {
+  if (!url) return;
+  const image = await prisma.storedImage.findUnique({
+    where: { id: url.slice("/api/images/".length) }, select: { id: true },
+  });
+  if (!image) throw new Error("La fotografía no existe. Vuelve a subirla antes de guardar.");
+}
+
+export async function createFraternityAction(
+  input: unknown
+): Promise<{ success: boolean; error?: string; fraternityId?: string }> {
+  try {
+    const session = await requireSession(["ADMIN"]);
+    requirePermission(session.role, "groups:write");
+
+    const parsed = fraternitySchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message || "Datos inválidos" };
+    }
+
+    const data = parsed.data;
+
+    const edition = await requireActiveEdition(data.editionId);
+    await requireStoredImage(data.logoUrl);
+
+    const name = data.name.trim();
+    const existing = await prisma.fraternity.findFirst({
+      where: { editionId: edition.id, name: { equals: name, mode: "insensitive" } },
+    });
+    if (existing) {
+      return { success: false, error: `Ya existe la fraternidad "${name}" en esta edición.` };
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      const fraternity = await tx.fraternity.create({
+        data: {
+          editionId: edition.id,
+          name,
+          university: data.university.trim(),
+          faculty: data.faculty?.trim() || null,
+          city: data.city.trim(),
+          department: data.department.trim(),
+          logoUrl: data.logoUrl ?? null,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          editionId: edition.id,
+          actorId: session.userId,
+          type: "FRATERNITY_CREATED",
+          entityType: "Fraternity",
+          entityId: fraternity.id,
+          metadata: { name, university: fraternity.university, city: fraternity.city },
+        },
+      });
+
+      return fraternity;
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/control");
+    return { success: true, fraternityId: created.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor";
+    return { success: false, error: message };
+  }
+}
+
+// ─── Registrar grupo de danza (ADMIN) ───────────────────────
+
+export async function createDanceGroupAction(
+  input: unknown
+): Promise<{ success: boolean; error?: string; danceGroupId?: string }> {
+  try {
+    const session = await requireSession(["ADMIN"]);
+    requirePermission(session.role, "groups:write");
+
+    const parsed = danceGroupSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message || "Datos inválidos" };
+    }
+
+    const data = parsed.data;
+    const danceName = data.danceName.trim();
+    const edition = await requireActiveEdition(data.editionId);
+    await requireStoredImage(data.photoUrl);
+
+    const fraternity = await prisma.fraternity.findUnique({
+      where: { id: data.fraternityId },
+    });
+    if (!fraternity || fraternity.editionId !== edition.id) {
+      return { success: false, error: "La fraternidad no pertenece a la edición activa." };
+    }
+
+    // Regla: una fraternidad ≡ una danza por edición
+    const duelDuplicate = await prisma.danceGroup.findFirst({
+      where: { editionId: edition.id, fraternityId: fraternity.id },
+      select: { id: true },
+    });
+    if (duelDuplicate) {
+      return {
+        success: false,
+        error: `${fraternity.name} ya tiene una danza registrada en esta edición.`,
+      };
+    }
+
+    if (data.entryOrder) {
+      const orderTaken = await prisma.danceGroup.findFirst({
+        where: { editionId: edition.id, entryOrder: data.entryOrder },
+        select: { id: true },
+      });
+      if (orderTaken) {
+        return { success: false, error: `El orden de ingreso #${data.entryOrder} ya está asignado.` };
+      }
+    }
+
+    const created = await prisma.$transaction(async (tx) => {
+      const group = await tx.danceGroup.create({
+        data: {
+          editionId: edition.id,
+          fraternityId: fraternity.id,
+          danceName,
+          numberOfDancers: data.numberOfDancers,
+          entryOrder: data.entryOrder ?? null,
+          photoUrl: data.photoUrl ?? null,
+          hasCaratula: data.hasCaratula ?? false,
+          hasMonografia: data.hasMonografia ?? false,
+          hasDancerList: data.hasDancerList ?? false,
+          hasInvitation: data.hasInvitation ?? false,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          editionId: edition.id,
+          actorId: session.userId,
+          type: "DANCE_GROUP_REGISTERED",
+          entityType: "DanceGroup",
+          entityId: group.id,
+          metadata: {
+            danceName,
+            fraternityName: fraternity.name,
+            entryOrder: data.entryOrder ?? null,
+            numberOfDancers: data.numberOfDancers,
+          },
+        },
+      });
+
+      return group;
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/jurado", "layout");
+    revalidatePath("/control");
+    return { success: true, danceGroupId: created.id };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor";
+    return { success: false, error: message };
+  }
+}
+
+// ─── Editar grupo de danza (ADMIN) ──────────────────────────
+
+export async function updateDanceGroupAction(
+  input: unknown
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await requireSession(["ADMIN"]);
+    requirePermission(session.role, "groups:write");
+
+    const parsed = danceGroupSchema
+      .extend({ danceGroupId: z.string().min(1) })
+      .safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message || "Datos inválidos" };
+    }
+
+    const { danceGroupId, fraternityId, danceName, numberOfDancers, entryOrder, hasCaratula, hasMonografia, hasDancerList, hasInvitation, photoUrl } =
+      parsed.data;
+    await requireStoredImage(photoUrl);
+
+    const existing = await prisma.danceGroup.findUnique({ where: { id: danceGroupId } });
+    if (!existing) {
+      return { success: false, error: "Grupo de danza no encontrado." };
+    }
+    await requireActiveEdition(parsed.data.editionId ?? existing.editionId);
+    if (parsed.data.editionId && parsed.data.editionId !== existing.editionId) {
+      return { success: false, error: "La danza no pertenece a la edición activa." };
+    }
+
+    const newFraternityId = fraternityId || existing.fraternityId;
+
+    if (newFraternityId !== existing.fraternityId) {
+      const fraternity = await prisma.fraternity.findUnique({ where: { id: newFraternityId } });
+      if (!fraternity || fraternity.editionId !== existing.editionId) {
+        return { success: false, error: "La fraternidad no pertenece a esta edición." };
+      }
+    }
+
+    // Regla: una fraternidad ≡ una danza por edición (al cambiar fraternidad)
+    if (newFraternityId !== existing.fraternityId) {
+      const duelDuplicate = await prisma.danceGroup.findFirst({
+        where: { editionId: existing.editionId, fraternityId: newFraternityId },
+        select: { id: true },
+      });
+      if (duelDuplicate && duelDuplicate.id !== danceGroupId) {
+        return { success: false, error: "Esa fraternidad ya tiene otra danza registrada en esta edición." };
+      }
+    }
+
+    if (entryOrder && entryOrder !== existing.entryOrder) {
+      const orderTaken = await prisma.danceGroup.findFirst({
+        where: { editionId: existing.editionId, entryOrder },
+        select: { id: true },
+      });
+      if (orderTaken && orderTaken.id !== danceGroupId) {
+        return { success: false, error: `El orden de ingreso #${entryOrder} ya está asignado.` };
+      }
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.danceGroup.update({
+        where: { id: danceGroupId },
+        data: {
+          danceName: danceName.trim(),
+          numberOfDancers,
+          entryOrder: entryOrder ?? null,
+          fraternityId: newFraternityId,
+          ...(hasCaratula !== undefined && { hasCaratula }),
+          ...(hasMonografia !== undefined && { hasMonografia }),
+          ...(hasDancerList !== undefined && { hasDancerList }),
+          ...(hasInvitation !== undefined && { hasInvitation }),
+          // undefined = mantener la foto actual; null = quitar la foto
+          ...(photoUrl !== undefined && { photoUrl }),
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          editionId: existing.editionId,
+          actorId: session.userId,
+          type: "DANCE_GROUP_UPDATED",
+          entityType: "DanceGroup",
+          entityId: danceGroupId,
+          metadata: {
+            danceName: danceName.trim(),
+            entryOrder: entryOrder ?? null,
+            photoChanged: photoUrl !== undefined && photoUrl !== existing.photoUrl,
+          },
+        },
+      });
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/jurado", "layout");
+    revalidatePath("/control");
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor";
+    return { success: false, error: message };
+  }
+}
+
+// ─── Foto de candidata Moperita/Ñusta (ADMIN) ───────────────
+
+export async function setParticipantPhotoAction(
+  input: unknown
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await requireSession(["ADMIN"]);
+    requirePermission(session.role, "participants:write");
+
+    const parsed = participantPhotoSchema.safeParse(input);
+    if (!parsed.success) {
+      return { success: false, error: parsed.error.issues[0]?.message || "Datos inválidos" };
+    }
+
+    const { participantId, photoUrl } = parsed.data;
+    await requireStoredImage(photoUrl);
+
+    const participant = await prisma.participant.findUnique({
+      where: { id: participantId },
+      select: { id: true, fullName: true, category: { select: { editionId: true } } },
+    });
+    if (!participant) {
+      return { success: false, error: "Candidata no encontrada." };
+    }
+    await requireActiveEdition(participant.category.editionId);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.participant.update({ where: { id: participantId }, data: { photoUrl } });
+
+      await tx.auditLog.create({
+        data: {
+          editionId: participant.category.editionId,
+          actorId: session.userId,
+          type: "PARTICIPANT_PHOTO_UPDATED",
+          entityType: "Participant",
+          entityId: participantId,
+          metadata: { fullName: participant.fullName, photoUrl },
+        },
+      });
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/jurado", "layout");
+    return { success: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error interno del servidor";
+    return { success: false, error: message };
+  }
+}

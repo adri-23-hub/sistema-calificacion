@@ -1,3 +1,4 @@
+import TableScroll from "@/components/TableScroll";
 import Link from "next/link";
 
 export interface NotaryVotingStatusItem {
@@ -30,10 +31,10 @@ export default function NotariaClient({
   auditLogs,
 }: NotariaClientProps) {
   return (
-    <div className="space-y-6">
-      <header className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
+      <header className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-teal-500/10 text-teal-400 border border-teal-500/20">
               Notaría de Fe Pública • Fiscalización Oficial
             </span>
@@ -65,7 +66,7 @@ export default function NotariaClient({
         </div>
       </header>
 
-      <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <div>
             <h2 className="text-xl font-bold text-white">
@@ -82,7 +83,7 @@ export default function NotariaClient({
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        <TableScroll>
           <table className="w-full min-w-[720px] text-left text-xs text-slate-300">
             <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
               <tr>
@@ -111,10 +112,10 @@ export default function NotariaClient({
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       </section>
 
-      <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
+      <section className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
         <h2 className="text-xl font-bold text-white">Libro Notarial de Auditoría</h2>
         <p className="text-xs text-slate-400">
           Registro cronológico e inmutable de eventos: votos emitidos, penalizaciones,

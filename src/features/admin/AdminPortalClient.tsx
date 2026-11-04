@@ -1,16 +1,20 @@
 "use client";
 
+import TableScroll from "@/components/TableScroll";
 import Link from "next/link";
+import PhotoUpload from "@/features/admin/components/PhotoUpload";
 import { useState, useTransition } from "react";
-import { saveAllEventConfigsAction } from "@/features/admin/actions";
+import { saveAllEventConfigsAction, setParticipantPhotoAction } from "@/features/admin/actions";
 import {
   disqualifyGroupAction,
   changeGroupStatusAction,
-  registerPenaltyAction,
   voidPenaltyAction,
-  voidDanceScoreAction as voidScoreAction,
 } from "@/features/danza/actions";
 import { exportResultsToExcel } from "@/lib/export-excel";
+import DanceRegistrationModal, {
+  type AdminFraternityOption,
+  type DanceGroupFormData,
+} from "@/features/admin/components/DanceRegistrationModal";
 
 export interface AdminEditionData {
   id: string;
@@ -24,11 +28,17 @@ export interface AdminGroupItem {
   id: string;
   entryOrder: number | null;
   danceName: string;
+  photoUrl?: string | null;
+  fraternityId: string;
   fraternityName: string;
   university: string;
   department: string;
   numberOfDancers: number;
   status: "PENDING" | "IN_SCORING" | "CLOSED";
+  hasCaratula?: boolean;
+  hasMonografia?: boolean;
+  hasDancerList?: boolean;
+  hasInvitation?: boolean;
   isDisqualified: boolean;
   disqualifyReason: string | null;
   arrivalTime: string | null;
@@ -95,6 +105,7 @@ export interface AdminConfigData {
 interface AdminPortalClientProps {
   adminName: string;
   edition: AdminEditionData;
+  fraternities: AdminFraternityOption[];
   groups: AdminGroupItem[];
   candidates: AdminCandidateItem[];
   recentAudits: AdminAuditItem[];
@@ -105,16 +116,34 @@ interface AdminPortalClientProps {
 export default function AdminPortalClient({
   adminName,
   edition: initialEdition,
+  fraternities: initialFraternities,
   groups: initialGroups,
-  candidates,
+  candidates: initialCandidates,
   recentAudits,
   hasSubmittedVotes,
   initialConfigs,
 }: AdminPortalClientProps) {
   const edition = initialEdition;
+  const [candidates, setCandidates] = useState(initialCandidates);
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [groups, setGroups] = useState<AdminGroupItem[]>(initialGroups);
+  const [fraternities, setFraternities] = useState<AdminFraternityOption[]>(initialFraternities);
   const [activeTab, setActiveTab] = useState<"groups" | "penalties" | "config" | "results" | "audit">("groups");
   const [isPending, startTransition] = useTransition();
+
+  // Modal de registro/edición de grupo de danza
+  const [danceModal, setDanceModal] = useState<{
+    isOpen: boolean;
+    initial: DanceGroupFormData | null;
+  }>({ isOpen: false, initial: null });
+
+  // Modal de foto de candidata
+  const [candidatePhotoModal, setCandidatePhotoModal] = useState<{
+    isOpen: boolean;
+    candidateId: string;
+    candidateName: string;
+    photoUrl: string | null;
+  }>({ isOpen: false, candidateId: "", candidateName: "", photoUrl: null });
 
   // Results tab sub-state: Concurso A vs Concurso B
   const [resultsContest, setResultsContest] = useState<"danzas" | "candidatas">("danzas");
@@ -162,6 +191,68 @@ export default function AdminPortalClient({
     jurorsModuleB: initialConfigs?.jurorsModuleB ?? 5,
     tieBreakOrder: initialConfigs?.tieBreakOrder ?? ["coreografia", "vestimenta", "entusiasmo"],
   });
+
+  // Registrar/editar grupo de danza (modal)
+  const handleDanceSaved = (result: { group?: DanceGroupFormData & { id: string }; fraternities: AdminFraternityOption[] }) => {
+    setFraternities(result.fraternities);
+
+    if (result.group && danceModal.initial?.id) {
+      // Edit: actualizar el grupo local
+      const saved = result.group;
+      setGroups((prev) =>
+        prev.map((g) =>
+          g.id === saved.id
+            ? {
+                ...g,
+                danceName: saved.danceName,
+                photoUrl: saved.photoUrl,
+                fraternityId: saved.fraternityId,
+                fraternityName:
+                  result.fraternities.find((f) => f.id === saved.fraternityId)?.name ?? g.fraternityName,
+                numberOfDancers: saved.numberOfDancers,
+                entryOrder: saved.entryOrder,
+                hasCaratula: saved.hasCaratula,
+                hasMonografia: saved.hasMonografia,
+                hasDancerList: saved.hasDancerList,
+                hasInvitation: saved.hasInvitation,
+              }
+            : g
+        )
+      );
+      showFeedback("success", "Grupo actualizado y registrado en auditoría");
+    } else if (result.group) {
+      // Create: agregar el grupo local al frente
+      const saved = result.group;
+      const fr = result.fraternities.find((f) => f.id === saved.fraternityId);
+      setGroups((prev) => [
+        {
+          id: saved.id,
+          entryOrder: saved.entryOrder,
+          danceName: saved.danceName,
+          photoUrl: saved.photoUrl,
+          fraternityId: saved.fraternityId,
+          fraternityName: fr?.name ?? "",
+          university: fr?.university ?? "",
+          department: fr?.department ?? "",
+          numberOfDancers: saved.numberOfDancers,
+          hasCaratula: saved.hasCaratula,
+          hasMonografia: saved.hasMonografia,
+          hasDancerList: saved.hasDancerList,
+          hasInvitation: saved.hasInvitation,
+          status: "PENDING" as const,
+          isDisqualified: false,
+          disqualifyReason: null,
+          arrivalTime: null,
+          votesCount: 0,
+          penalties: [],
+        },
+        ...prev,
+      ]);
+      showFeedback("success", "Danza registrada. Ya aparece en el jurado y en control.");
+      setActiveTab("groups");
+    }
+    setDanceModal({ isOpen: false, initial: null });
+  };
 
   // Cambiar estado de grupo
   const handleChangeGroupStatus = (groupId: string, newStatus: "PENDING" | "IN_SCORING" | "CLOSED") => {
@@ -338,11 +429,11 @@ export default function AdminPortalClient({
   const filteredCandidates = candidates.filter((c) => c.categorySlug === resultsCategorySlug);
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-4 sm:space-y-6">
       {/* Top Banner */}
-      <header className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <header className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
               Comité Organizador • ADMIN
             </span>
@@ -389,7 +480,7 @@ export default function AdminPortalClient({
       )}
 
       {/* Tabs Principales */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-2">
+      <div className="grid grid-cols-1 min-[400px]:grid-cols-2 lg:flex lg:flex-wrap gap-2 border-b border-slate-800 pb-2">
         {[
           { id: "groups", label: `Grupos de Danza (${groups.length})` },
           { id: "penalties", label: "Penalizaciones y Sanciones" },
@@ -413,17 +504,27 @@ export default function AdminPortalClient({
 
       {/* TAB 1: GRUPOS DE DANZA */}
       {activeTab === "groups" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex justify-between items-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
+          <div className="flex justify-between items-center flex-wrap gap-3">
             <h2 className="text-lg font-bold text-white">Grupos de Danza Participantes</h2>
-            <span className="text-xs text-slate-400">{groups.length} grupos registrados</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-xs text-slate-400">{groups.length} grupos registrados</span>
+              <button
+                onClick={() => setDanceModal({ isOpen: true, initial: null })}
+                className="px-3 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all disabled:opacity-40 cursor-pointer"
+              >
+                <span>➕</span>
+                <span>Registrar Danza</span>
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                 <tr>
                   <th className="p-3">Orden</th>
+                  <th className="p-3">Foto</th>
                   <th className="p-3">Danza</th>
                   <th className="p-3">Fraternidad</th>
                   <th className="p-3">Universidad</th>
@@ -438,6 +539,57 @@ export default function AdminPortalClient({
                   <tr key={group.id} className="hover:bg-slate-800/40">
                     <td className="p-3 font-mono text-amber-400 font-bold">
                       #{String(group.entryOrder || 0).padStart(2, "0")}
+                    </td>
+                    <td className="p-3">
+                      {group.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={group.photoUrl}
+                          alt={group.danceName}
+                          className="w-11 h-8 object-cover rounded border border-slate-600 cursor-pointer hover:scale-125 transition-transform"
+                          onClick={() =>
+                            setDanceModal({
+                              isOpen: true,
+                              initial: {
+                                id: group.id,
+                                danceName: group.danceName,
+                                photoUrl: group.photoUrl ?? null,
+                                fraternityId: group.fraternityId,
+                                numberOfDancers: group.numberOfDancers,
+                                entryOrder: group.entryOrder,
+                                hasCaratula: group.hasCaratula ?? false,
+                                hasMonografia: group.hasMonografia ?? false,
+                                hasDancerList: group.hasDancerList ?? false,
+                                hasInvitation: group.hasInvitation ?? false,
+                              },
+                            })
+                          }
+                        />
+                      ) : (
+                        <button
+                          onClick={() =>
+                            setDanceModal({
+                              isOpen: true,
+                              initial: {
+                                id: group.id,
+                                danceName: group.danceName,
+                                photoUrl: null,
+                                fraternityId: group.fraternityId,
+                                numberOfDancers: group.numberOfDancers,
+                                entryOrder: group.entryOrder,
+                                hasCaratula: group.hasCaratula ?? false,
+                                hasMonografia: group.hasMonografia ?? false,
+                                hasDancerList: group.hasDancerList ?? false,
+                                hasInvitation: group.hasInvitation ?? false,
+                              },
+                            })
+                          }
+                          className="w-11 h-8 rounded border border-dashed border-slate-600 text-slate-500 hover:text-indigo-300 hover:border-indigo-400 text-sm"
+                          title="Agregar foto"
+                        >
+                          📷
+                        </button>
+                      )}
                     </td>
                     <td className="p-3 font-semibold text-white">{group.danceName}</td>
                     <td className="p-3">{group.fraternityName}</td>
@@ -468,6 +620,30 @@ export default function AdminPortalClient({
                       )}
                     </td>
                     <td className="p-3 text-right space-x-1">
+                      <button
+                        onClick={() =>
+                          setDanceModal({
+                            isOpen: true,
+                            initial: {
+                              id: group.id,
+                              danceName: group.danceName,
+                              photoUrl: group.photoUrl ?? null,
+                              fraternityId: group.fraternityId,
+                              numberOfDancers: group.numberOfDancers,
+                              entryOrder: group.entryOrder,
+                              // El checklist real se obtiene al editar desde BD; los botones
+                              // permiten ajustarlo de inmediato en el modal
+                              hasCaratula: group.hasCaratula ?? false,
+                              hasMonografia: group.hasMonografia ?? false,
+                              hasDancerList: group.hasDancerList ?? false,
+                              hasInvitation: group.hasInvitation ?? false,
+                            },
+                          })
+                        }
+                        className="px-2 py-1 rounded bg-slate-700 hover:bg-slate-600 text-white font-semibold text-[11px]"
+                      >
+                        Editar
+                      </button>
                       {group.status === "PENDING" && !group.isDisqualified && (
                         <button
                           disabled={isPending}
@@ -506,14 +682,14 @@ export default function AdminPortalClient({
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
         </div>
       )}
 
       {/* TAB 2: PENALIZACIONES */}
       {activeTab === "penalties" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex justify-between items-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <div>
               <h2 className="text-lg font-bold text-white">Historial de Penalizaciones</h2>
               <p className="text-xs text-slate-400">
@@ -528,14 +704,14 @@ export default function AdminPortalClient({
               .map((penalty) => (
                 <div
                   key={penalty.id}
-                  className={`p-4 rounded-xl border flex justify-between items-center ${
+                  className={`p-4 rounded-xl border flex flex-col sm:flex-row justify-between sm:items-center gap-3 ${
                     penalty.isVoided
                       ? "bg-slate-950/40 border-slate-800/60 opacity-50"
                       : "bg-slate-950 border-slate-800"
                   }`}
                 >
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
                           penalty.type === "YELLOW_FLAG"
@@ -563,7 +739,7 @@ export default function AdminPortalClient({
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <span className="font-mono font-bold text-rose-400 text-sm">
                       −{penalty.points} pts
                     </span>
@@ -591,9 +767,9 @@ export default function AdminPortalClient({
 
       {/* TAB 3: CONFIGURACIÓN OFICIAL (SECCIÓN 5 DEL REGLAMENTO) */}
       {activeTab === "config" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-8">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-8">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 text-[11px] font-bold uppercase tracking-wider">
                 Reglamento Oficial 2026 &bull; Sección 5
               </span>
@@ -609,10 +785,10 @@ export default function AdminPortalClient({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 sm:gap-6">
             {/* SECCIÓN 1: CONCURSO B — ENTRADA FOLKLÓRICA */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="bg-slate-950 p-3 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                 <h3 className="font-bold text-white text-sm flex items-center gap-2">
                   <span>🎭</span>
                   <span>Concurso B: Entrada Folklórica (Danzas)</span>
@@ -622,7 +798,7 @@ export default function AdminPortalClient({
 
               <div className="space-y-3">
                 <p className="text-xs text-slate-300 font-medium">Ponderación de los 3 Criterios Oficiales:</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-400 mb-1">
                       Coreografía (%)
@@ -716,8 +892,8 @@ export default function AdminPortalClient({
             </div>
 
             {/* SECCIÓN 2: CONCURSO A — MOPERITA Y ÑUSTA DE BOLIVIA */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+            <div className="bg-slate-950 p-3 sm:p-5 rounded-2xl border border-slate-800 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-2">
                 <h3 className="font-bold text-white text-sm flex items-center gap-2">
                   <span>👑</span>
                   <span>Concurso A: Moperita y Ñusta de Bolivia</span>
@@ -728,7 +904,7 @@ export default function AdminPortalClient({
               {/* Ponderación de las 3 Pasadas */}
               <div className="space-y-3">
                 <p className="text-xs text-slate-300 font-medium">Ponderación de las 3 Pasadas Obligatorias:</p>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-400 mb-1">
                       Ropa de Gala (%)
@@ -881,13 +1057,13 @@ export default function AdminPortalClient({
             </div>
 
             {/* SECCIÓN 3: REGLAS GENERALES Y DESEMPATE */}
-            <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-4 lg:col-span-2">
+            <div className="bg-slate-950 p-3 sm:p-5 rounded-2xl border border-slate-800 space-y-4 xl:col-span-2">
               <h3 className="font-bold text-white text-sm flex items-center gap-2 border-b border-slate-800 pb-2">
                 <span>⚙️</span>
                 <span>Reglas Generales de Calificación y Escrutinio</span>
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
                     Método de Agregación:
@@ -1008,7 +1184,7 @@ export default function AdminPortalClient({
 
       {/* TAB 4: RESULTADOS OFICIALES Y RANKING */}
       {activeTab === "results" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h2 className="text-xl font-bold text-white">Resultados Oficiales de los Concursos</h2>
@@ -1052,7 +1228,7 @@ export default function AdminPortalClient({
           {/* VISTA CONCURSO B: DANZAS */}
           {resultsContest === "danzas" && (
             <div className="space-y-4">
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     <tr>
@@ -1099,7 +1275,7 @@ export default function AdminPortalClient({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </div>
           )}
 
@@ -1130,7 +1306,7 @@ export default function AdminPortalClient({
                 </button>
               </div>
 
-              <div className="overflow-x-auto">
+              <TableScroll>
                 <table className="w-full text-left text-xs text-slate-300">
                   <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                     <tr>
@@ -1154,7 +1330,16 @@ export default function AdminPortalClient({
                           {c.rank && c.rank > 3 && `${c.rank}.ª`}
                           {!c.rank && "—"}
                         </td>
-                        <td className="p-3 font-semibold text-white">{c.fullName}</td>
+                        <td className="p-3 font-semibold text-white">
+                          <button type="button" className="flex items-center gap-2 text-left" title="Cambiar fotografía"
+                            onClick={() => setCandidatePhotoModal({ isOpen: true, candidateId: c.id, candidateName: c.fullName, photoUrl: c.photoUrl })}>
+                            {c.photoUrl ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={c.photoUrl} alt={c.fullName} className="w-10 h-12 rounded object-cover" />
+                            ) : <span aria-hidden="true">📷</span>}
+                            <span>{c.fullName}<span className="block text-indigo-300 text-[11px]">Cambiar foto</span></span>
+                          </button>
+                        </td>
                         <td className="p-3">
                           {c.fraternityName} &bull;{" "}
                           <span className="text-slate-400">{c.university}</span>
@@ -1187,7 +1372,7 @@ export default function AdminPortalClient({
                     )}
                   </tbody>
                 </table>
-              </div>
+              </TableScroll>
             </div>
           )}
         </div>
@@ -1195,8 +1380,8 @@ export default function AdminPortalClient({
 
       {/* TAB 5: AUDITORÍA */}
       {activeTab === "audit" && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-          <div className="flex justify-between items-center">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 space-y-4">
+          <div className="flex flex-wrap justify-between items-center gap-3">
             <h2 className="text-xl font-bold text-white">Registro Inmutable de Auditoría</h2>
             <span className="text-xs text-slate-400">{recentAudits.length} eventos recientes</span>
           </div>
@@ -1204,7 +1389,7 @@ export default function AdminPortalClient({
             {recentAudits.map((audit) => (
               <div
                 key={audit.id}
-                className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center text-xs"
+                className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs"
               >
                 <div>
                   <span className="font-mono font-bold text-indigo-400 mr-2">{audit.type}</span>
@@ -1221,10 +1406,39 @@ export default function AdminPortalClient({
         </div>
       )}
 
+      {danceModal.isOpen && (
+        <DanceRegistrationModal editionId={edition.id} fraternities={fraternities}
+          initial={danceModal.initial} onClose={() => setDanceModal({ isOpen: false, initial: null })}
+          onSaved={handleDanceSaved} onFraternitiesChanged={setFraternities} />
+      )}
+
+      {candidatePhotoModal.isOpen && (
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80" role="dialog" aria-modal="true" aria-label="Foto de candidata">
+          <div className="app-dialog-panel bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+            <h3 className="text-lg font-bold text-white">Foto de {candidatePhotoModal.candidateName}</h3>
+            <PhotoUpload value={candidatePhotoModal.photoUrl} disabled={isPending} onBusyChange={setPhotoBusy}
+              onChange={(photoUrl) => setCandidatePhotoModal((prev) => ({ ...prev, photoUrl }))} />
+            <div className="flex justify-end gap-3">
+              <button type="button" disabled={isPending || photoBusy} onClick={() => setCandidatePhotoModal((prev) => ({ ...prev, isOpen: false }))}>Cancelar</button>
+              <button type="button" disabled={isPending || photoBusy} className="px-4 py-2 rounded-xl bg-indigo-600 text-white disabled:opacity-50"
+                onClick={() => startTransition(async () => {
+                  try {
+                    const res = await setParticipantPhotoAction({ participantId: candidatePhotoModal.candidateId, photoUrl: candidatePhotoModal.photoUrl });
+                    if (!res.success) { showFeedback("error", res.error || "No se pudo guardar la fotografía"); return; }
+                    setCandidates((prev) => prev.map((c) => c.id === candidatePhotoModal.candidateId ? { ...c, photoUrl: candidatePhotoModal.photoUrl } : c));
+                    setCandidatePhotoModal((prev) => ({ ...prev, isOpen: false }));
+                    showFeedback("success", "Fotografía actualizada");
+                  } catch { showFeedback("error", "No se pudo guardar. Revisa tu conexión."); }
+                })}>{isPending ? "Guardando…" : "Guardar foto"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MODAL DESCALIFICACIÓN */}
       {disqualifyModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="app-dialog-panel bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-rose-400">Descalificar Grupo</h3>
             <p className="text-xs text-slate-300">
               Vas a descalificar a <strong>{disqualifyModal.groupName}</strong>. El grupo quedará fuera
@@ -1265,8 +1479,8 @@ export default function AdminPortalClient({
 
       {/* MODAL ANULAR PENALIZACIÓN */}
       {voidPenaltyModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+          <div className="app-dialog-panel bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-lg font-bold text-white">Anular Penalización</h3>
             <p className="text-xs text-slate-300">
               Anulación de penalización para <strong>{voidPenaltyModal.groupName}</strong>.

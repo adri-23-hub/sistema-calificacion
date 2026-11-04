@@ -69,7 +69,7 @@ export function JuradoNavDesktop() {
   const pathname = usePathname();
 
   return (
-    <div className="hidden sm:flex items-center gap-1">
+    <div className="hidden xl:flex items-center gap-1">
       {NAV_ITEMS.map((item) => {
         const active = isItemActive(item, pathname);
         return (
@@ -101,8 +101,8 @@ export function JuradoNavMobile() {
   const pathname = usePathname();
 
   return (
-    <div className="sm:hidden fixed bottom-0 inset-x-0 glass-strong border-t border-outline-variant/20 z-50 px-2 py-2">
-      <div className="flex items-center justify-around">
+    <div className="jurado-mobile-nav xl:hidden fixed bottom-0 inset-x-0 glass-strong border-t border-outline-variant/20 z-40 px-2 py-2">
+      <div className="grid grid-cols-5 gap-1">
         {NAV_ITEMS.map((item) => {
           const active = isItemActive(item, pathname);
           return (
@@ -112,8 +112,8 @@ export function JuradoNavMobile() {
               aria-current={active ? "page" : undefined}
               className={
                 active
-                  ? "flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-tertiary bg-tertiary/15 border border-tertiary/30 shadow-sm"
-                  : "flex flex-col items-center gap-0.5 px-2.5 py-1 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
+                  ? "flex flex-col items-center min-w-0 gap-0.5 px-1 py-1.5 rounded-lg text-tertiary bg-tertiary/15 border border-tertiary/30 shadow-sm"
+                  : "flex flex-col items-center min-w-0 gap-0.5 px-1 py-1.5 rounded-lg text-on-surface hover:bg-surface-container-high transition-colors"
               }
             >
               <span
@@ -122,7 +122,7 @@ export function JuradoNavMobile() {
               >
                 {item.icon}
               </span>
-              <span className={`text-[10px] font-display ${active ? "font-extrabold" : "font-semibold"}`}>
+              <span className={`text-[10px] leading-tight text-center font-display ${active ? "font-extrabold" : "font-semibold"}`}>
                 {item.shortLabel ?? item.label}
               </span>
             </Link>

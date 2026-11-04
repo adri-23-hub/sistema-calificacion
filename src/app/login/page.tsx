@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -64,7 +65,7 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="w-full min-h-screen bg-amazon-gradient flex items-center justify-center p-4 sm:p-8 selection:bg-tertiary selection:text-on-tertiary">
+    <main className="w-full min-h-screen overflow-x-clip bg-amazon-gradient flex items-center justify-center p-4 sm:p-8 selection:bg-tertiary selection:text-on-tertiary">
       <div className="flex flex-col w-full max-w-2xl mx-auto py-4">
         {/* Ambient Glows */}
         <div className="relative w-full flex flex-col items-center">
@@ -83,7 +84,7 @@ export default function LoginPage() {
               <div className="relative group mb-3">
                 <div className="absolute -inset-2 bg-gradient-to-r from-tertiary/30 via-secondary/25 to-primary/30 rounded-xl blur-lg transition duration-500 group-hover:blur-xl" />
                 <div className="relative w-28 sm:w-36 h-28 sm:h-36 p-1 rounded-xl bg-surface-container-high shadow-xl flex items-center justify-center border border-tertiary/30">
-                  <img
+                  <Image width={144} height={144} unoptimized
                     src="https://lh3.googleusercontent.com/aida-public/AB6AXuBEa6OWFRhuAnqRkSLT63fsRCbhtkCownVVCiNuuXqq5IiASOkU61G38QSE0yZu09rjYgyJjb-B_bREkPqUecWqofKeSHAH9-3I9nQ1AKByYaZfM272EDqAi51_mE1P--i9rjOaJ4XtQ4xubsRQjIlfLKNT7l75dKRBUOSEifV6qT4upTm-rnZOfwBmNX1Wz9PJ5Yi2k2DD4nikUpx7cYwfssYkc4rvgiHy3jd4uP63J5A7rhVZL3WWAfcNf36ayTRHOw"
                     alt="Emblema Oficial XIII Entrada Folklórica Universitaria Nacional - Trinidad Beni"
                     className="w-full h-full object-contain rounded-lg"

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useMemo } from "react";
 import Link from "next/link";
 
@@ -299,7 +300,7 @@ export default function MyScoresClient({
                 >
                   <div className="flex items-start gap-3">
                     {item.photoUrl ? (
-                      <img
+                      <Image width={48} height={48} unoptimized
                         src={item.photoUrl}
                         alt={item.candidateName}
                         className="w-12 h-12 rounded-full object-cover border-2 border-primary/50 shadow-md shrink-0"
@@ -390,7 +391,7 @@ export default function MyScoresClient({
                 >
                   <div className="flex items-start gap-3">
                     {item.photoUrl ? (
-                      <img
+                      <Image width={48} height={48} unoptimized
                         src={item.photoUrl}
                         alt={item.candidateName}
                         className="w-12 h-12 rounded-full object-cover border-2 border-primary/50 shadow-md shrink-0"

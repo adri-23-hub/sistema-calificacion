@@ -42,14 +42,14 @@ export default async function AdminLayout({
 
       {/* Navigation */}
       <nav className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800/80 px-4 sm:px-8 py-3">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Link href="/admin" className="flex items-center gap-2 group">
-              <span className="font-bold text-lg text-white">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="contents xl:flex xl:min-w-0 xl:items-center xl:gap-6">
+            <Link href="/admin" className="min-w-0 flex-1 xl:flex-none flex items-center gap-2 group">
+              <span className="font-bold text-base sm:text-lg text-white">
                 Comité Organizador <span className="text-indigo-400">• Administración</span>
               </span>
             </Link>
-            <div className="hidden sm:flex items-center gap-4 text-xs font-medium text-slate-400">
+            <div className="order-last flex w-full flex-wrap items-center gap-2 text-xs font-medium text-slate-400 xl:order-none xl:w-auto xl:gap-4">
               <Link href="/admin" className="text-white hover:text-indigo-400 transition-colors">
                 Panel General
               </Link>
@@ -62,8 +62,8 @@ export default async function AdminLayout({
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:block text-right">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <div className="hidden lg:block max-w-48 break-words text-right">
               <div className="text-sm font-semibold text-white">{session.name}</div>
               <div className="text-xs text-slate-400">{session.code || "ADMIN"}</div>
             </div>
@@ -80,7 +80,7 @@ export default async function AdminLayout({
       </nav>
 
       {/* Main Content */}
-      <main className="flex-1 py-4 sm:py-6">{children}</main>
+      <main className="min-w-0 w-full flex-1 py-4 sm:py-6">{children}</main>
     </div>
   );
 }

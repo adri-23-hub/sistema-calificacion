@@ -36,7 +36,7 @@ export function exportResultsToExcel(options: {
   candidates?: CandidateExportData[];
   filename?: string;
 }): void {
-  const { editionName, danceGroups, candidates, filename = "Resultados_Entrada_Folklorica_2026.xlsx" } = options;
+  const { danceGroups, candidates, filename = "Resultados_Entrada_Folklorica_2026.xlsx" } = options;
 
   const wb = XLSX.utils.book_new();
 

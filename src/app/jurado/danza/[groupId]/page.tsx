@@ -40,6 +40,7 @@ export default async function CalificarDanzaPage({ params }: PageProps) {
     id: group.id,
     entryOrder: group.entryOrder,
     danceName: group.danceName,
+    photoUrl: group.photoUrl,
     fraternityName: group.fraternity.name,
     university: group.fraternity.university,
     city: group.fraternity.city,
@@ -65,7 +66,7 @@ export default async function CalificarDanzaPage({ params }: PageProps) {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-w-0 max-w-7xl mx-auto py-2 sm:py-4">
       <DanceScoringClient
         juryName={session.name}
         juryCode={session.code || "JUR-01"}

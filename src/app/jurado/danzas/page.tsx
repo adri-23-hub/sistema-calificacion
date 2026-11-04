@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getActiveEdition } from "@/lib/active-edition";
 import JuryDancesClient, { type DanceItem } from "@/features/voting/components/JuryDancesClient";
 
 export const dynamic = "force-dynamic";
@@ -604,94 +605,74 @@ export default async function JuradoPage() {
   }
 
   let dances: DanceItem[] = [];
+  let usingDemo = false;
 
   try {
-    // 1. Obtener grupos de danza (Módulo A)
-    const dbDanceGroups = await prisma.danceGroup.findMany({
-      include: {
-        fraternity: true,
-        danceScores: {
-          where: {
-            juryId: session.userId,
-            status: "SUBMITTED",
+    const edition = await getActiveEdition();
+    if (edition) {
+      // 1. Obtener grupos de danza (Módulo A)
+      const dbDanceGroups = await prisma.danceGroup.findMany({
+        where: { editionId: edition.id },
+        include: {
+          fraternity: true,
+          danceScores: {
+            where: {
+              juryId: session.userId,
+              status: "SUBMITTED",
+            },
           },
         },
-      },
-      orderBy: [{ entryOrder: "asc" }],
-    });
+        orderBy: [{ entryOrder: "asc" }],
+      });
 
-    const danceGroupItems: DanceItem[] = dbDanceGroups.map((g) => ({
-      id: g.id,
-      order: g.entryOrder || 99,
-      status: g.status === "IN_SCORING" ? "ACTIVE" : (g.status as "PENDING" | "CLOSED"),
-      categoryName: "Entrada Folklórica",
-      categorySlug: "entrada-folklorica",
-      danceName: g.danceName,
-      fraternityName: g.fraternity.name,
-      university: g.fraternity.university,
-      city: g.fraternity.city,
-      department: g.fraternity.department,
-      candidateName: `Fraternidad Oficial (${g.numberOfDancers} bailarines)`,
-      candidateTitle: "Módulo A • Grupo de Danza",
-      photoUrl: null,
-      score: g.danceScores[0]
-        ? {
-            rawTotal: g.danceScores[0].rawTotal,
-            payloadHash: g.danceScores[0].payloadHash || "",
-            submittedAt: g.danceScores[0].submittedAt.toISOString(),
-          }
-        : null,
-    }));
+      const danceGroupItems: DanceItem[] = dbDanceGroups.map((g) => ({
+        id: g.id,
+        order: g.entryOrder || 99,
+        status: g.status === "IN_SCORING" ? "ACTIVE" : (g.status as "PENDING" | "CLOSED"),
+        categoryName: "Entrada Folklórica",
+        categorySlug: "entrada-folklorica",
+        danceName: g.danceName,
+        fraternityName: g.fraternity.name,
+        university: g.fraternity.university,
+        city: g.fraternity.city,
+        department: g.fraternity.department,
+        candidateName: `Fraternidad Oficial (${g.numberOfDancers} bailarines)`,
+        candidateTitle: "Módulo A • Grupo de Danza",
+        photoUrl: g.photoUrl,
+        score: g.danceScores[0]
+          ? {
+              rawTotal: g.danceScores[0].rawTotal,
+              payloadHash: g.danceScores[0].payloadHash || "",
+              submittedAt: g.danceScores[0].submittedAt.toISOString(),
+            }
+          : null,
+      }));
 
-    // 2. Obtener candidatas (Módulo B)
-    const entries = await prisma.entry.findMany({
-      include: {
-        category: true,
-        participant: {
-          include: { fraternity: true },
-        },
-        scores: {
-          where: {
-            juryId: session.userId,
-            status: "SUBMITTED",
+      // 2. Obtener candidatas (Módulo B)
+      const entries = await prisma.entry.findMany({
+        where: { category: { editionId: edition.id } },
+        include: {
+          category: true,
+          participant: {
+            include: { fraternity: true },
+          },
+          scores: {
+            where: {
+              juryId: session.userId,
+              status: "SUBMITTED",
+            },
           },
         },
-      },
-      orderBy: [
-        { category: { order: "asc" } },
-        { order: "asc" },
-      ],
-    });
+        orderBy: [
+          { category: { order: "asc" } },
+          { order: "asc" },
+        ],
+      });
 
-    if (danceGroupItems.length > 0 || entries.length > 0) {
+
       const candidateItems: DanceItem[] = entries.map((e) => {
         const userScore = e.scores[0];
-        const fallback =
-          FALLBACK_DANCES.find(
-            (f) => f.order === e.order && f.categorySlug === e.category.slug
-          ) || FALLBACK_DANCES[(e.order - 1) % FALLBACK_DANCES.length];
-
-const FOLK_PHOTOS = [
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBOPMlR0YCFYCxV0Q2MeWwDv1FlL0lkgxPtVxLhj19hj8gODVmgCimwIlgMWjZpzznL_Y33oXZkjEXavwIw_nCFbNY_FL-Rmd_fWc9VWiu9MYntKNP8QDKJxoFr4BRE1v5OKdmw8Bg9RY-XorYFVW1yAgRF6R4Hp83yBc5mGgSFMatXlSy4Pim_4BAYWf5uE0dBDwp8Eq9naNoffkVKLIrlQdLXqUMAokAgaSOQ2HNHnormqXmR32Cn",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuA1YPKcnEFNguSLmmIHimTunbF6dZa60k9BxxW8qCwhW5s6GeBfH5LvZAVLMqMijJTJDxUT2Bj6N9909WQXPusaOtsfdDNDNEXdv0oMubVkXvQVrR3uiPTSUFMhNM1ac3j9w8Sl1smVKk95XAW84IuyCPem3vZhTWdE2HodRFOoeONQhd1L8zrfT3jvbxjWUD9PdT4pTGESGoB67OqEDNsGrfeixbEp5mVfTAxssaHZDOcTNjG6gvHz",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD6bgPzFm0eHyq5kPxQRZmDiO_PRFMQ-Hly9dx3PqgxXIRXn1FaS2bl0MJpxyC68z9gf1OS36t9BiFxtFxEMfA2QrvRnMd3fAuqjK9OnLiNcgydX91rlLi1ArUEQktJF5ly0PuEZYBjCkw7f3XylGudYLkDviP2JOA11qOvcCIBYEZW8JPZrVfJISxkqMWfW4YpDv6E6polpf3W7MXxD72q-quvyO1m0bPubOMg6RdEvmcmwYQvgsXG5BHLdugWcUoFmoCrhE4CLX0",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBfhovqeJ0_fpEHOT9dmZm97GhiEXTfhKnVtTQOKbxU-tnWt7rLd5XwxpXcrzw3qAeGp1rsRA95TKU_i-V71xVwEE-Pmqpxo2FlgaG2Z-XeFDz6K-jSmdpqLIbcDwahS77hgLGQumN11OVWsuITaKjjhuCotjUY2Lr2jifviaJ7JF9Og5LGC_IFjBx49_aPZAQ0Q_FKiCd0h6nnmUY-LPpmKObUGHfskpV7Vcyn3jybQvYeFk4QpUew",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCTmoUB-pJb9PAO2rduiM7b1i8e8LqKctE1yzjtDHpVYPTfzIvIVNI5U5LWSsr6kaerakcfe0aktjaileskm-Xa_VdE_wdOV-VPDpyVtGvtQ27ExUpommsroC6m_-JtpzBNDuO7qXiWvpgLadp9ebW1wL2SdZ6EXZGeRuWFw3lmjsypNUjuKj2r0S7Hbg-FlrTsBBOdeX_d7blbsXPI1H-OO16PxRe8DHrvbup_VonpPkUIHfyUYBaj",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuBF6BEhWW-veH5u1jsArgO-OA0gIw6mz2nCinCcD22U_YzxBeVneB5ePZkfrCdvqMgi32LAxBIAzmHymh9to8bdO15MaYOLdkx4QaGjlEMF77Ms31Gta9VdBseovRKpAdrNpMjGvZaUVZgEsOASxgk2AWacInmap772wXyEIsNVX69c-aH-GvrMgsc7lv7azLvaicuye1uTJ1fQ9fwoGiUWV2wqYcK-_thGgJKThlFLPJL8C4DuUg8D",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDKn2sscK_EQmyJjoNUjlxLgtvqyDj_5qvl_c4LfwmZam4c06jrXTctPDFJyE52nDzWnhz_S-zv-ftpYmSOEmfs1wTOEpGLEKyo2PyQl_0ExcaXI6e80a37IVa7P955UQxIzaXDy617SUXplBKiDKR974Q7WCcY1gdenachkMZHJllts7nemBYhIBUgt8YTWsRA-7NI9ZstewNK92gK1eLPNGb_0YU8oaCASDvtZY9OoqRd83ds7Yb7X_TKgGCZBmpc0OGJ8hk57xw",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCIl0PEuAp-hgCXV03wVU0-rwZ1m0Jn46sdsZ7keTEdAPCgjxS6vPSTetZNJXTMerHTluPoj_8MytiRgsHOqVK_1cMMSfsUj0RGpvmugmMkxQOwCeb36Ti8fPox1HCiYJltGnw65kSO7jcYVm8OX7hq4Kks7_a8gUkOui30IefPE2br9jCSpHpguIUjibuyVrH4dJoigCUbzr2ubFk4n81Bokwle-OWq0ScxDRRQpF1nLssnd3E2YgcliUB4B8a_T6wTCRSS8kyaPw",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCFMxss_jp1Inxrj8gIvbh0JWoVMNjOGHAdawj14bozUsl1xIvFNRmlI1hl1hfjNDyr8CZmFaENICvpoxHV6x6PjZ6-rsPb8Yp6I_V-1aiuSGh4yaCBkoRSxlUeNXZxTL9CKbPOEI7iHo9SIWzL-LCMSnOaft7zw9KUXe5pKAeBjmqphcLsT5ghyln7hgCr4SCpzEyehOF_sjhLJyGUio4dUJWLnGx73-Ve5VQD-LpcB00kG567speegZzFdnEW7aKl0IlVRtJUlIY",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuDymZxa29C5SmE-xm3lHr_EIfydi38S0qvrd7o2u-Wyzr7iYFrrgiddC8opuZkRdUuZO2DlL_YMnO3RZ3PPtmmkEpJ5LtDGZC-CiAKRXIHkB87RS-TGzikIPWTe2WhXupyrVK5M_hTtfheH5j5Kzr2vMOzRtbe7dCeoYGZgs74W6ZndhPxD-mtdPZioy0569lRYSO9HNgjTj3JaQeAjtkYqKCIIDiEaiKKAXi-_wW5Vqi8NEoGATp3cet5vU1ytRyQ7CaOIw2FmI_8",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuD4AgxjTt235Ol5CQsYAySyoxADM8NJZ0AYFMB3C4SMVPfDOK_1HfvLG8NDcA4halMl15amsHT1ux0cdfx79ROORxVo3tx3tSmUexMcLl9jcECQyEMWcDoV4bujOtSjU5ZdPWFFZ8r1okr0IU-ZuZATnKknjSYzq0LfioPfdhGvu_Al1h1wxwLN9kC9mLCPiqns4GVYyb7cke2UoF5weC6QUIA_eY_grYKxS5Zvn703ph22yjeZ2CIZ",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCtDiEDyF0hMEgEM4jaQxMy0L-VY0gyt2B_HZ-H-uqj5rCxmQ_JGcS9HcuBpM1j8AjAv5FmU_vzqivr8q7K1jRbePRz-TkD6UWTOIeADA-nkSxlPuOBcDqKtueup2eESruI4WMxOjEbU1FKsfbKaMDD1Ic_Zpd70d-HI6e2-NLQwVJRX0o_kYPqJTBSQR0dkOEWVmidmOEb40nd3zXF-OkhJ8BILaFMXqyriBlQpLwnSK0R7u1V7PT1",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuB9spQw6tW_sm2PgvjD24nXJ78tmbm76ItjtKSErTFq3VzR7lst57jpaHydLgHpmDSs3aK_E4FZrSJXcHM1HUDcLhKF6FljHo7rCI1HdthYE6bJWUo00_Ni2WIVfHtXjdzJZaOUwNgIM66tCVOFuh-BBCvwakqo5kIy7iuBc8nv7Wd9Ld2T-qr8SfQBj6nOC7H3OrY5KXKhcM8xF0Ldk6u24e8__oVXEwWYHFCv0E4eSPrRJ5cfsRIe",
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuAo3eyvzj6gb72DaKDp7kucqvtG8Z7sDYRuXK5LFBOt6TWe0gmxW7gEeL5JLs11x6OnUmzZnrVLvxJastrTBquoUgoMQIXT0cXrIeJQ_hj7lATqzMa4w0ebQLoAE_WI3Z2jrzc-sMtwAGR8BHlTe-hhw7T6btXVRFjdc1Gb0QuStBUNN6Zh-1nUTIlD5mZz7oB4LZ9tLn-R5UpbMHV-7TaDH1lKf1GLoDw4vuI8QQH9Nctcam3Vg8ny3fu6vxuPH5HFX-xCR7CkChg"
-];
-
-        const assignedPhoto =
-          e.participant.photoUrl ||
-          fallback?.photoUrl ||
-          FOLK_PHOTOS[(e.order - 1) % FOLK_PHOTOS.length];
+        const assignedPhoto = e.participant.photoUrl;
 
         return {
           id: e.id,
@@ -701,14 +682,13 @@ const FOLK_PHOTOS = [
           categorySlug: e.category.slug,
           danceName:
             e.participant.bio ||
-            fallback?.danceName ||
             e.participant.fraternity.name,
           fraternityName: e.participant.fraternity.name,
           university: e.participant.fraternity.university,
           city: e.participant.fraternity.city,
           department: e.participant.fraternity.department,
-          candidateName: e.participant.fullName || fallback?.candidateName,
-          candidateTitle: `Candidata a ${e.category.name} 2026`,
+          candidateName: e.participant.fullName,
+          candidateTitle: `Candidata a ${e.category.name} ${edition.year}`,
           photoUrl: assignedPhoto,
           score: userScore
             ? {
@@ -720,16 +700,15 @@ const FOLK_PHOTOS = [
         };
       });
       dances = [...danceGroupItems, ...candidateItems];
-    } else {
-      dances = FALLBACK_DANCES;
     }
   } catch (error) {
     console.warn("Could not query DB directly, using seed catalog:", error);
     dances = FALLBACK_DANCES;
+    usingDemo = true;
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-w-0 max-w-7xl mx-auto py-2 sm:py-4">
       <div className="mb-4">
         <Link
           href="/jurado"
@@ -739,6 +718,7 @@ const FOLK_PHOTOS = [
           Volver al Menú Principal
         </Link>
       </div>
+      {usingDemo && <p role="status" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-950/30 p-4 text-amber-200 text-sm">No se pudo consultar la base de datos. Se muestra el catálogo de demostración.</p>}
       <JuryDancesClient
         juryName={session.name}
         juryCode={session.code || "JUR-04"}

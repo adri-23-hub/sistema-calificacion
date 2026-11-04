@@ -1,5 +1,6 @@
 "use client";
 
+import TableScroll from "@/components/TableScroll";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { exportResultsToExcel } from "@/lib/export-excel";
@@ -135,7 +136,7 @@ export default function ResultadosClient({ initialData }: ResultadosClientProps)
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6 sm:space-y-8">
       <header className="text-center space-y-3">
         <div className="inline-flex flex-wrap justify-center items-center gap-2">
           <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold">
@@ -266,7 +267,7 @@ export default function ResultadosClient({ initialData }: ResultadosClientProps)
             </div>
           </div>
 
-          <div className="order-1 md:order-2 bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-900 border-2 border-amber-500/60 rounded-3xl p-8 text-center space-y-4 relative overflow-hidden shadow-2xl scale-105">
+          <div className="order-1 md:order-2 bg-gradient-to-b from-amber-500/20 via-slate-900 to-slate-900 border-2 border-amber-500/60 rounded-3xl p-8 text-center space-y-4 relative overflow-hidden shadow-2xl md:scale-105">
             <div className="w-16 h-16 bg-amber-500/20 text-amber-400 font-bold text-3xl rounded-2xl flex items-center justify-center mx-auto border border-amber-500/50 shadow-lg shadow-amber-500/30">
               🥇
             </div>
@@ -322,7 +323,7 @@ export default function ResultadosClient({ initialData }: ResultadosClientProps)
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full min-w-[820px] text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                 <tr>
@@ -380,7 +381,7 @@ export default function ResultadosClient({ initialData }: ResultadosClientProps)
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
 
           {filteredDance.length === 0 && (
             <div className="py-10 text-center">
@@ -418,7 +419,7 @@ export default function ResultadosClient({ initialData }: ResultadosClientProps)
             />
           </div>
 
-          <div className="overflow-x-auto">
+          <TableScroll>
             <table className="w-full min-w-[920px] text-left text-xs text-slate-300">
               <thead className="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
                 <tr>
@@ -467,7 +468,7 @@ export default function ResultadosClient({ initialData }: ResultadosClientProps)
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableScroll>
 
           {filteredCandidates.length === 0 && (
             <div className="py-10 text-center">

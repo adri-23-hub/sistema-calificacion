@@ -172,6 +172,7 @@ model DanceGroup {
   fraternityId     String
   danceName        String      // nombre de la danza
   numberOfDancers  Int         // número de bailarines (mínimo 50 para nacionales)
+  photoUrl         String?     // foto del grupo (comprimida; se sirve vía /api/images/[id])
   entryOrder       Int?        // orden de ingreso (asignado por sorteo)
   arrivalTime      DateTime?   // hora de llegada registrada por CONTROL
   arrivalRegisteredBy String?  // userId del CONTROL que registró la llegada
@@ -442,6 +443,16 @@ model ScoreItem {
   criterion    Criterion @relation(fields: [criterionId], references: [id], onDelete: Cascade)
 
   @@unique([scoreId, criterionId])
+}
+
+// ─── StoredImage (imágenes comprimidas: fotos de danzas, candidatas, logos) ──
+
+model StoredImage {
+  id        String   @id @default(cuid())
+  mime      String   // image/jpeg | image/webp | image/png
+  data      Bytes
+  size      Int      // tamaño final en bytes
+  createdAt DateTime @default(now())
 }
 
 // ─── EventConfig (configuración editable por ADMIN) ─────────

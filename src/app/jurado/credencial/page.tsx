@@ -20,9 +20,9 @@ export default async function JuradoCredencialPage() {
   const sessionFingerprint = `0x${Buffer.from(session.userId + session.code + "2026").toString("hex").slice(0, 32).toUpperCase()}`;
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4">
+    <div className="min-w-0 max-w-4xl mx-auto py-4 sm:py-6">
       {/* Botón Volver */}
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap gap-3 items-center justify-between">
         <Link
           href="/jurado"
           className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm text-tertiary bg-tertiary/10 hover:bg-tertiary/20 border border-tertiary/30 font-display font-bold transition-all shadow-sm"
@@ -39,7 +39,7 @@ export default async function JuradoCredencialPage() {
       </div>
 
       {/* Main Credential Card */}
-      <div className="relative bg-[#0a2e1d]/80 backdrop-blur-2xl border border-tertiary/40 rounded-3xl p-6 sm:p-10 shadow-2xl overflow-hidden">
+      <div className="relative bg-[#0a2e1d]/80 backdrop-blur-2xl border border-tertiary/40 rounded-3xl p-4 sm:p-10 shadow-2xl overflow-hidden">
         {/* Top Gold & Macaw Gradient Bar */}
         <div className="absolute top-0 inset-x-0 h-2 bg-gradient-to-r from-secondary-container via-tertiary to-emerald" />
 
@@ -96,7 +96,7 @@ export default async function JuradoCredencialPage() {
           </div>
 
           {/* Right: Simulated QR Card */}
-          <div className="flex flex-col items-center bg-[#001208]/90 p-5 rounded-2xl border border-tertiary/30 shadow-xl w-60 flex-shrink-0">
+          <div className="flex flex-col items-center bg-[#001208]/90 p-5 rounded-2xl border border-tertiary/30 shadow-xl w-full max-w-60 flex-shrink-0">
             {/* Visual SVG QR Code */}
             <div className="bg-white p-3 rounded-xl shadow-inner mb-3">
               <svg className="w-36 h-36" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">

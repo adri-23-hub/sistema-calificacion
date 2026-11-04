@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { getActiveEdition } from "@/lib/active-edition";
 import {
   calculateDanceGroupFinalScore,
   calculateCandidateFinalScore,
@@ -16,6 +17,7 @@ import AdminPortalClient, {
   type AdminAuditItem,
   type AdminConfigData,
 } from "@/features/admin/AdminPortalClient";
+import type { AdminFraternityOption } from "@/features/admin/components/DanceRegistrationModal";
 
 export const dynamic = "force-dynamic";
 
@@ -35,14 +37,12 @@ export default async function AdminPage() {
   }
 
   // 1. Obtener edición activa
-  const edition = await prisma.edition.findFirst({
-    orderBy: { year: "desc" },
-  });
+  const edition = await getActiveEdition();
 
   if (!edition) {
     return (
       <div className="p-8 text-center text-slate-400">
-        No se encontró ninguna edición activa del certamen. Ejecuta el seed para inicializar.
+        No hay una edición activa del certamen. Activa una edición antes de registrar fraternidades, danzas o fotografías.
       </div>
     );
   }
@@ -139,6 +139,24 @@ export default async function AdminPage() {
     orderBy: [{ entryOrder: "asc" }, { createdAt: "asc" }],
   });
 
+  // 3.b Fraternidades de la edición (para el registro de danzas)
+  const dbFraternities = await prisma.fraternity.findMany({
+    where: { editionId: edition.id },
+    include: { danceGroups: { select: { id: true } } },
+    orderBy: { name: "asc" },
+  });
+
+  const fraternities: AdminFraternityOption[] = dbFraternities.map((f) => ({
+    id: f.id,
+    name: f.name,
+    university: f.university,
+    faculty: f.faculty,
+    city: f.city,
+    department: f.department,
+    logoUrl: f.logoUrl,
+    hasDanceGroup: f.danceGroups.length > 0,
+  }));
+
   // 4. Calcular resultados por grupo de danza (Concurso B)
   const groups: AdminGroupItem[] = dbGroups.map((g) => {
     const penaltySummary: PenaltySummary = {
@@ -167,11 +185,17 @@ export default async function AdminPage() {
       id: g.id,
       entryOrder: g.entryOrder,
       danceName: g.danceName,
+      photoUrl: g.photoUrl,
+      fraternityId: g.fraternityId,
       fraternityName: g.fraternity.name,
       university: g.fraternity.university,
       department: g.fraternity.department,
       numberOfDancers: g.numberOfDancers,
       status: g.status as "PENDING" | "IN_SCORING" | "CLOSED",
+      hasCaratula: g.hasCaratula,
+      hasMonografia: g.hasMonografia,
+      hasDancerList: g.hasDancerList,
+      hasInvitation: g.hasInvitation,
       isDisqualified: g.isDisqualified,
       disqualifyReason: g.disqualifyReason,
       arrivalTime: g.arrivalTime?.toISOString() || null,
@@ -359,10 +383,11 @@ export default async function AdminPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+    <div className="min-w-0 w-full max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-2 sm:py-6">
       <AdminPortalClient
         adminName={session.name}
         edition={editionData}
+        fraternities={fraternities}
         groups={groups}
         candidates={allCandidates}
         recentAudits={recentAudits}

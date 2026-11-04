@@ -89,27 +89,32 @@
   --spacing-gutter-tablet: 1.5rem;
 
   /* Font families */
-  --font-display: 'Outfit', system-ui, sans-serif;
-  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-headline-lg: 'Outfit', system-ui, sans-serif;
-  --font-headline-md: 'Outfit', system-ui, sans-serif;
-  --font-headline-sm: 'Outfit', system-ui, sans-serif;
-  --font-label-lg: 'Outfit', system-ui, sans-serif;
-  --font-label-md: 'Outfit', system-ui, sans-serif;
-  --font-label-sm: 'Outfit', system-ui, sans-serif;
-  --font-label-numeric: 'Outfit', system-ui, sans-serif;
-  --font-body-lg: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body-md: 'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-body-sm: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-display: var(--font-outfit), system-ui, sans-serif;
+  --font-body: var(--font-jakarta), system-ui, sans-serif;
+  --font-headline-lg: var(--font-outfit), system-ui, sans-serif;
+  --font-headline-md: var(--font-outfit), system-ui, sans-serif;
+  --font-headline-sm: var(--font-outfit), system-ui, sans-serif;
+  --font-label-lg: var(--font-outfit), system-ui, sans-serif;
+  --font-label-md: var(--font-outfit), system-ui, sans-serif;
+  --font-label-sm: var(--font-outfit), system-ui, sans-serif;
+  --font-label-numeric: var(--font-outfit), system-ui, sans-serif;
+  --font-body-lg: var(--font-jakarta), system-ui, sans-serif;
+  --font-body-md: var(--font-jakarta), system-ui, sans-serif;
+  --font-body-sm: var(--font-jakarta), system-ui, sans-serif;
 }
 
 /* ─── Base Styles ──────────────────────────────────────────── */
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
+  min-width: 0;
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
   overscroll-behavior: none;
   background: radial-gradient(130% 90% at 50% 0%, #0a3320 0%, #03170d 65%, #010b06 100%) fixed;
   font-family: var(--font-body);
@@ -154,8 +159,8 @@ body {
 
 .text-display-hero {
   font-family: var(--font-display);
-  font-size: 48px;
-  line-height: 56px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  line-height: 1.17;
   letter-spacing: 0.02em;
   font-weight: 800;
 }
@@ -170,8 +175,8 @@ body {
 
 .text-headline-lg {
   font-family: var(--font-display);
-  font-size: 36px;
-  line-height: 44px;
+  font-size: clamp(1.5rem, 3.5vw, 2.25rem);
+  line-height: 1.23;
   letter-spacing: 0.01em;
   font-weight: 700;
 }
@@ -453,7 +458,7 @@ body {
 
 .material-symbols-outlined,
 .ms {
-  font-family: 'Material Symbols Outlined' !important;
+  font-family: var(--font-symbols) !important;
   font-weight: normal;
   font-style: normal;
   font-size: 22px;
@@ -496,4 +501,95 @@ body {
 
 .input::placeholder {
   color: var(--color-outline);
+}
+
+/* Contenedores flex/grid: las tablas y los textos largos no amplían la página. */
+:where(main, section, article, aside, header, nav, footer, form, fieldset),
+:where(.grid > *, .flex-1) {
+  min-width: 0;
+}
+
+:where(h1, h2, h3, p, code) {
+  overflow-wrap: anywhere;
+}
+
+:where(input, select, textarea) {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.table-scroll {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0.75rem;
+}
+
+.table-scroll > table {
+  width: 100%;
+}
+
+@layer components {
+  .table-scroll > table { min-width: 44rem; }
+}
+
+.table-scroll:focus-visible {
+  outline: 2px solid var(--color-secondary);
+  outline-offset: 2px;
+}
+
+.app-dialog-overlay {
+  height: 100dvh;
+  padding-top: max(0.75rem, env(safe-area-inset-top));
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+  padding-left: max(0.75rem, env(safe-area-inset-left));
+  padding-right: max(0.75rem, env(safe-area-inset-right));
+}
+
+.app-dialog-panel {
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.jurado-mobile-nav {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  padding-left: max(0.5rem, env(safe-area-inset-left));
+  padding-right: max(0.5rem, env(safe-area-inset-right));
+}
+
+.jurado-content {
+  padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1280px) {
+  .jurado-content { padding-bottom: 2rem; }
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  :where(button, [role="button"], nav a, input[type="submit"]) {
+    min-height: 44px;
+    touch-action: manipulation;
+  }
+  :where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, textarea) {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 767px) {
+  /* Evita que iOS amplíe la página al enfocar campos pequeños. */
+  :where(input:not([type="checkbox"]):not([type="radio"]), select, textarea) {
+    font-size: 16px;
+  }
+}
+
+@media print {
+  body { padding: 0; }
+  .table-scroll { overflow: visible; }
+  .table-scroll > table { min-width: 0; }
+  .table-scroll-hint { display: none; }
+  .jurado-mobile-nav { display: none; }
+  .jurado-content { padding-bottom: 0; }
 }

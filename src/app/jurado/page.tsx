@@ -54,7 +54,7 @@ export default async function JuradoMenuPage() {
   }
 
   return (
-    <div className="max-w-[1400px] mx-auto py-2 sm:py-6 px-2 sm:px-4">
+    <div className="min-w-0 max-w-[1400px] mx-auto py-2 sm:py-6">
       {/* Telemetry & Welcome Header */}
       <header className="mb-8">
         <div className="relative overflow-hidden p-5 sm:p-7 rounded-3xl bg-[#0a2e1d]/60 border border-white/10 backdrop-blur-2xl shadow-2xl">

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useId } from "react";
 import Link from "next/link";
 import { submitScoreAction } from "@/features/voting/actions";
@@ -197,7 +198,7 @@ export default function ScoringFormClient({
             {/* Candidate Image Banner */}
             <div className="relative w-full h-80 sm:h-96 lg:h-[380px] overflow-hidden bg-surface-container-highest">
               {entry.photoUrl ? (
-                <img
+                <Image fill sizes="(max-width: 1024px) 100vw, 33vw" unoptimized
                   src={entry.photoUrl}
                   alt={entry.candidateName}
                   className="w-full h-full object-cover object-top filter brightness-105"
@@ -541,7 +542,7 @@ export default function ScoringFormClient({
                     military_tech
                   </span>
 
-                  <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-space-lg">
+                  <div className="relative z-10 flex flex-col 2xl:flex-row items-center justify-between gap-space-lg">
                     {/* Left Title + Score */}
                     <div className="flex flex-col text-center md:text-left">
                       <span className="font-label-sm text-label-sm text-primary uppercase font-bold tracking-widest flex items-center justify-center md:justify-start gap-1">
@@ -601,7 +602,7 @@ export default function ScoringFormClient({
                     <button
                       type="button"
                       onClick={() => setIsModalOpen(true)}
-                      className="w-full md:w-auto px-space-xl py-space-md min-h-[58px] rounded-xl bg-tertiary hover:bg-tertiary-fixed text-on-tertiary-fixed font-headline-sm text-headline-sm font-extrabold flex items-center justify-center gap-space-sm transition-all transform active:scale-95 shadow-xl hover:shadow-tertiary/20 shrink-0 cursor-pointer"
+                      className="w-full 2xl:w-auto px-space-xl py-space-md min-h-[58px] rounded-xl bg-tertiary hover:bg-tertiary-fixed text-on-tertiary-fixed font-headline-sm text-headline-sm font-extrabold flex items-center justify-center gap-space-sm transition-all transform active:scale-95 shadow-xl hover:shadow-tertiary/20 shrink-0 cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-2xl font-bold">send_and_archive</span>
                       <span>Enviar Calificación Definitiva</span>
@@ -616,8 +617,8 @@ export default function ScoringFormClient({
 
       {/* Confirmation Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-space-md bg-surface-container-lowest/80 backdrop-blur-md transition-opacity duration-200">
-          <div className="relative w-full max-w-lg rounded-2xl bg-surface-container-low p-space-lg sm:p-space-xl shadow-2xl border border-tertiary/40 flex flex-col gap-space-md animate-in fade-in zoom-in-95">
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-space-md bg-surface-container-lowest/80 backdrop-blur-md transition-opacity duration-200">
+          <div className="app-dialog-panel relative w-full max-w-lg rounded-2xl bg-surface-container-low p-space-lg sm:p-space-xl shadow-2xl border border-tertiary/40 flex flex-col gap-space-md animate-in fade-in zoom-in-95">
             {/* Warning Header */}
             <div className="flex items-start gap-space-md">
               <div className="w-12 h-12 rounded-xl bg-error-container/30 text-error flex items-center justify-center shrink-0 border border-error/40">
@@ -648,13 +649,13 @@ export default function ScoringFormClient({
             <div className="rounded-xl bg-surface-container-high/80 p-space-md flex flex-col gap-space-xs border border-outline-variant/30">
               <div className="flex justify-between items-center text-label-sm font-label-sm text-on-surface-variant">
                 <span>Danza Evaluada:</span>
-                <span className="text-on-surface font-bold truncate max-w-[240px]">
+                <span className="text-on-surface font-bold truncate min-w-0 max-w-[60%] text-right">
                   #{String(entry.order).padStart(2, "0")} • {entry.danceName}
                 </span>
               </div>
               <div className="flex justify-between items-center text-label-sm font-label-sm text-on-surface-variant">
                 <span>Candidata:</span>
-                <span className="text-secondary font-bold truncate max-w-[240px]">
+                <span className="text-secondary font-bold truncate min-w-0 max-w-[60%] text-right">
                   {entry.candidateName}
                 </span>
               </div>

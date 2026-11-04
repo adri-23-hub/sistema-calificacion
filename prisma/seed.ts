@@ -1,4 +1,4 @@
-import { PrismaClient, Role, RubricStatus, CategoryStatus, EditionStatus, EntryStatus, ModuleType, RunwayType, PenaltyType } from "@prisma/client";
+import { PrismaClient, Role, RubricStatus, CategoryStatus, EditionStatus, EntryStatus, ModuleType, RunwayType } from "@prisma/client";
 import { createHash } from "crypto";
 
 const prisma = new PrismaClient();

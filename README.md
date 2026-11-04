@@ -34,3 +34,9 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Compilación en Windows
+
+`npm run dev` y `npm run build` usan Webpack, compatible con Next.js 16.4.3. Turbopack falla en este entorno al iniciar el proceso de PostCSS (el proceso termina antes de conectarse). Esta elección permite compilar sin cambiar las reglas de la aplicación ni las dependencias de Next.js.
+
+Las fuentes del diseño se sirven localmente desde `src/app/fonts`, con sus licencias incluidas; la compilación no necesita descargarlas.

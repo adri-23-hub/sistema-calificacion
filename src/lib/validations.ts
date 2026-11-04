@@ -157,17 +157,59 @@ export const runwayWeightsSchema = z
 // ─── Grupo de danza ─────────────────────────────────────────
 
 export const danceGroupSchema = z.object({
+  editionId: z.string().min(1).optional(),
   fraternityId: z.string().min(1),
-  danceName: z.string().min(1, "Nombre de la danza requerido").max(200),
-  numberOfDancers: z.number().int().min(1, "Debe haber al menos 1 bailarín"),
-  entryOrder: z.number().int().min(1).optional(),
+  danceName: z.string().trim().min(1, "Nombre de la danza requerido").max(200),
+  numberOfDancers: z.number().int().min(1, "Debe haber al menos 1 bailarín").max(500),
+  entryOrder: z.number().int().min(1).nullable().optional(),
   hasCaratula: z.boolean().optional(),
   hasMonografia: z.boolean().optional(),
   hasDancerList: z.boolean().optional(),
   hasInvitation: z.boolean().optional(),
+  photoUrl: z
+    .string()
+    .regex(/^\/api\/images\/[a-z0-9]+$/i, "URL de imagen inválida")
+    .nullable()
+    .optional(),
 });
 
 export type DanceGroupInput = z.infer<typeof danceGroupSchema>;
+
+// ─── Fraternidad ────────────────────────────────────────────
+
+export const fraternitySchema = z.object({
+  editionId: z.string().min(1).optional(),
+  name: z.string().trim().min(1, "Nombre de la fraternidad requerido").max(200),
+  university: z.string().trim().min(1, "Universidad requerida").max(200),
+  faculty: z.string().max(200).optional(),
+  city: z.string().trim().min(1, "Ciudad requerida").max(100),
+  department: z.string().trim().min(1, "Departamento requerido").max(100),
+  logoUrl: z
+    .string()
+    .regex(/^\/api\/images\/[a-z0-9]+$/i, "URL de logo inválida")
+    .nullable()
+    .optional(),
+});
+
+export type FraternityInput = z.infer<typeof fraternitySchema>;
+
+// ─── Foto de candidata (Módulo B) ───────────────────────────
+
+export const participantPhotoSchema = z.object({
+  participantId: z.string().min(1),
+  photoUrl: z
+    .string()
+    .regex(/^\/api\/images\/[a-z0-9]+$/i, "URL de foto inválida")
+    .nullable(),
+});
+
+export type ParticipantPhotoInput = z.infer<typeof participantPhotoSchema>;
+
+// ─── Validación de URL de imagen del almacén interno ────────
+
+export function isStoredImageUrl(url: unknown): url is string {
+  return typeof url === "string" && /^\/api\/images\/[a-z0-9]+$/i.test(url);
+}
 
 // ─── Candidata ──────────────────────────────────────────────
 
