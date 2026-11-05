@@ -13,6 +13,7 @@ export interface LiveDanceItem {
   id: string;
   entryOrder: number | null;
   danceName: string;
+  photoUrl: string | null;
   fraternityName: string;
   university: string;
   department: string;

@@ -352,6 +352,7 @@ export async function getLiveResults(
       id: group.id,
       entryOrder: group.entryOrder,
       danceName: group.danceName,
+      photoUrl: group.photoUrl,
       fraternityName: group.fraternity.name,
       university: group.fraternity.university,
       department: group.fraternity.department,

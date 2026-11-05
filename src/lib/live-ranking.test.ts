@@ -9,6 +9,7 @@ import type { LiveCandidateItem, LiveDanceItem } from "@/features/live/types";
 function dance(overrides: Partial<LiveDanceItem> & { id: string }): LiveDanceItem {
   return {
     entryOrder: null,
+    photoUrl: null,
     danceName: `Danza ${overrides.id}`,
     fraternityName: "Fraternidad",
     university: "Universidad",

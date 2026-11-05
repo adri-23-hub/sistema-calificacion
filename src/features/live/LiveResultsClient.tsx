@@ -39,7 +39,7 @@ export default function LiveResultsClient({ initialData }: { initialData: LiveRe
       {error && <div role="alert" className={styles.error}>{error} · Mostrando la última actualización disponible.</div>}
       <div className={styles.tabs} aria-label="Seleccionar concurso">{data.moduleB.categories.map(c => <button key={c.id} type="button" aria-pressed={!dances && category.id === c.id} onClick={() => setSelection(c.id)}><Icon>{c.name.toLowerCase().includes("moperita") ? "local_florist" : "diamond"}</Icon><span>{c.name} {data.edition.year}<small>ELECCIÓN UNIVERSITARIA NACIONAL</small></span></button>)}<button type="button" aria-pressed={dances} onClick={() => setSelection("danzas")}><Icon>diversity_2</Icon><span>Entrada Folklórica<small>FRATERNIDADES UNIVERSITARIAS</small></span></button></div>
       <section className={styles.podium} aria-label={`Podio de ${title}`}>
-        {ranked.length ? ranked.slice(0,3).map(item => <PodiumCard key={`${selection}-${item.id}`} item={item} final={isFinal} title={title} />) : <div className={styles.empty}><Icon>workspace_premium</Icon><h2>El podio está por comenzar</h2><p>Las posiciones aparecerán cuando se registren las primeras calificaciones de {title}.</p></div>}
+        {ranked.length ? ranked.slice(0,3).map(item => <PodiumCard key={`${selection}-${item.id}-${item.photoUrl ?? "no-photo"}`} item={item} final={isFinal} title={title} />) : <div className={styles.empty}><Icon>workspace_premium</Icon><h2>El podio está por comenzar</h2><p>Las posiciones aparecerán cuando se registren las primeras calificaciones de {title}.</p></div>}
       </section>
       <div className={styles.status}><span className={styles.live}><i /> {isFinal ? "RESULTADOS FINALES" : "RESULTADOS PRELIMINARES"}</span><span aria-live="polite">{isRefreshing ? "Actualizando…" : `Actualizado ${updated}`}</span><button onClick={toggleFullscreen} type="button"><Icon>fullscreen</Icon>{fullscreen ? "Salir" : "Pantalla completa"}</button></div>
       <section className={styles.classification}>
@@ -52,7 +52,7 @@ export default function LiveResultsClient({ initialData }: { initialData: LiveRe
 }
 
 function PodiumCard({ item, final, title }: { item: RankedItem; final: boolean; title: string }) {
-  const photo = "photoUrl" in item ? item.photoUrl : null;
+  const photo = item.photoUrl;
   const [broken, setBroken] = useState(false);
   const first = item.rank === 1;
   const complete = expectedVotes(item) > 0 && item.votesCount >= expectedVotes(item);
