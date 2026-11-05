@@ -3,6 +3,8 @@ import { SignJWT } from "jose";
 import { NextRequest } from "next/server";
 import { proxy } from "./proxy";
 
+process.env.AUTH_SECRET = "test-only-secret-with-at-least-32-bytes";
+
 describe("protección de rutas tras migrar a Proxy", () => {
   it.each([
     ["ADMIN", "/admin", true],
@@ -15,7 +17,7 @@ describe("protección de rutas tras migrar a Proxy", () => {
     ["NOTARIO", "/admin", false],
   ])("rol %s en %s conserva acceso=%s", async (role, path, allowed) => {
     const secret = new TextEncoder().encode(process.env.AUTH_SECRET || "dev-secret-change-in-production");
-    const token = await new SignJWT({ role, userId: "test-user" }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1m").sign(secret);
+    const token = await new SignJWT({ role, userId: "test-user", sessionVersion: 2 }).setProtectedHeader({ alg: "HS256" }).setExpirationTime("1m").sign(secret);
     const response = await proxy(new NextRequest("http://localhost" + path, { headers: { cookie: "session=" + token } }));
     expect(response.headers.get("location")).toBe(allowed ? null : "http://localhost/login");
   });

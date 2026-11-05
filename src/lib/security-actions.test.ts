@@ -1,0 +1,12 @@
+import { beforeEach, expect, it, vi } from "vitest";
+const m = vi.hoisted(() => ({ count: vi.fn(), upsert: vi.fn(), assignment: vi.fn(), group: vi.fn(), create: vi.fn() }));
+vi.mock("@/lib/auth", () => ({ requireSession: async () => ({ userId: "j", role: "ADMIN" }) }));
+vi.mock("@/lib/rbac", () => ({ requirePermission: vi.fn() }));
+vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/db", () => { const tx = { $queryRaw: vi.fn(), danceScore: { count: m.count, create: m.create }, score: { count: m.count }, eventConfig: { upsert: m.upsert }, danceGroup: { findUnique: m.group }, juryAssignment: { findUnique: m.assignment } }; return { prisma: { $transaction: (fn: (t: unknown) => unknown) => fn(tx) } }; });
+import { saveEventConfigAction, saveAllEventConfigsAction } from "../features/admin/actions";
+import { submitDanceScoreAction } from "../features/danza/actions";
+beforeEach(() => { vi.resetAllMocks(); m.count.mockResolvedValue(1); m.group.mockResolvedValue({ id: "g", status: "IN_SCORING", editionId: "ed" }); m.assignment.mockResolvedValue(null); });
+it("bloquea guardar pesos individuales con votos existentes", async () => { expect((await saveEventConfigAction("ed", "moduleA.weights", {coreografia:1,vestimenta:49,entusiasmo:50})).success).toBe(false); expect(m.upsert).not.toHaveBeenCalled(); });
+it("bloquea guardar todos los pesos con votos existentes", async () => { expect((await saveAllEventConfigsAction({editionId:"ed",moduleAWeights:{coreografia:1,vestimenta:49,entusiasmo:50},moduleBCriteriaWeights:{porteElegancia:25,carismaSimpatia:25,autenticidadTraje:25,originalidadEstilo:25},moduleBRunwayWeights:{GALA:30,CASUAL:30,TIPICA:40},penaltyOrder:"AFTER_AVERAGE",scoringRule:"MEAN",decimals:2,juryCount:{moduleA:5,moduleB:5},tieBreakOrder:[]})).success).toBe(false);expect(m.upsert).not.toHaveBeenCalled(); });
+it("impide votar danza sin asignación", async () => { expect((await submitDanceScoreAction({danceGroupId:"g",coreografia:80,vestimenta:80,entusiasmo:80})).success).toBe(false); expect(m.create).not.toHaveBeenCalled(); });

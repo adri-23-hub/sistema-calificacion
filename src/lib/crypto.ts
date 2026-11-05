@@ -8,12 +8,18 @@ import { createHash } from "crypto";
  */
 
 export function canonicalJSON(obj: unknown): string {
-  return JSON.stringify(obj, Object.keys(obj as Record<string, unknown>).sort());
+  return JSON.stringify(obj, (_key, value) => {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return Object.fromEntries(Object.keys(value).sort().map(key => [key, value[key]]));
+    }
+    if (typeof value === "number" && !Number.isFinite(value)) throw new Error("Número no finito en el sello.");
+    return value;
+  });
 }
 
 export function computePayloadHash(payload: unknown): string {
-  const data = `v1|${canonicalJSON(payload)}`;
-  return createHash("sha256").update(data).digest("hex");
+  const data = `v2|${canonicalJSON(payload)}`;
+  return "v2:" + createHash("sha256").update(data).digest("hex");
 }
 
 export function computeChainHash(previousHash: string, payloadHash: string): string {

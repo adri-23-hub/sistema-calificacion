@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "dev-secret-change-in-production"
-);
+import { getAuthSecret, SESSION_VERSION } from "@/lib/session-config";
 
 const PUBLIC_PATHS = ["/login", "/vivo", "/resultados", "/verificar", "/api/health", "/api/live"];
 
@@ -31,7 +29,8 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
+    const { payload } = await jwtVerify(token, getAuthSecret(), { algorithms: ["HS256"] });
+    if (payload.sessionVersion !== SESSION_VERSION) throw new Error("Sesión anterior invalidada");
     const role = payload.role as string;
 
     // Role-based route protection

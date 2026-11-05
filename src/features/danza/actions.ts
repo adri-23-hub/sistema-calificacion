@@ -2,6 +2,8 @@
 
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { lockEdition, requireJuryAssignment } from "@/lib/vote-authorization";
+import { normalizeWeights, weightKeys } from "@/lib/config-weights";
 import { computePayloadHash } from "@/lib/crypto";
 import { requirePermission } from "@/lib/rbac";
 import { danceScoreSchema, penaltySchema, disqualifySchema, voidScoreSchema, voidPenaltySchema, arrivalRegistrationSchema } from "@/lib/validations";
@@ -31,20 +33,6 @@ export async function submitDanceScoreAction(
 
     const { danceGroupId, coreografia, vestimenta, entusiasmo, observations, clientUuid } = parsed.data;
 
-    // Calcular nota con función pura
-    const rawTotal = calculateDanceJuryScore({ coreografia, vestimenta, entusiasmo });
-
-    // Compute hash del payload
-    const payloadHash = computePayloadHash({
-      danceGroupId,
-      juryId: session.userId,
-      coreografia,
-      vestimenta,
-      entusiasmo,
-      rawTotal,
-      submittedAt: new Date().toISOString(),
-    });
-
     // Transacción atómica para la regla de voto único
     const score = await prisma.$transaction(async (tx) => {
       // Verificar que el grupo existe y está en calificación
@@ -66,6 +54,17 @@ export async function submitDanceScoreAction(
         throw new Error("Este grupo aún no está en calificación");
       }
 
+      await lockEdition(tx, group.editionId);
+      await requireJuryAssignment(tx, session.userId, group.editionId, "ENTRADA_FOLKLORICA");
+      const current = await tx.danceGroup.findUnique({ where: { id: danceGroupId } });
+      if (!current || current.status !== "IN_SCORING" || current.isDisqualified) throw new Error("La votación no está abierta.");
+      const config = await tx.eventConfig.findMany({ where: { editionId: group.editionId, key: { in: ["moduleA.weights", "moduleA.criteria.weights"] } } });
+      const storedWeights = config.find(c => c.key === "moduleA.weights") ?? config[0];
+      const weights = storedWeights ? normalizeWeights(storedWeights.value, weightKeys["moduleA.weights"]) as unknown as { coreografia: number; vestimenta: number; entusiasmo: number } : undefined;
+      const rawTotal = calculateDanceJuryScore({ coreografia, vestimenta, entusiasmo }, weights);
+      const submittedAt = new Date();
+      const payload = { danceGroupId, juryId: session.userId, coreografia, vestimenta, entusiasmo, rawTotal, submittedAt: submittedAt.toISOString() };
+      const payloadHash = computePayloadHash(payload);
       // Verificar voto único (constraint DB + check explícito)
       const existing = await tx.danceScore.findFirst({
         where: {
@@ -88,6 +87,7 @@ export async function submitDanceScoreAction(
           vestimenta,
           entusiasmo,
           rawTotal,
+          submittedAt,
           status: "SUBMITTED",
           observations: observations?.trim() || null,
           payloadHash,
@@ -110,6 +110,8 @@ export async function submitDanceScoreAction(
             entusiasmo,
             rawTotal,
             payloadHash,
+            payload,
+            hashVersion: 2,
           },
         },
       });
@@ -118,7 +120,7 @@ export async function submitDanceScoreAction(
     });
 
     revalidatePath("/jurado");
-    return { success: true, scoreId: score.id, rawTotal };
+    return { success: true, scoreId: score.id, rawTotal: score.rawTotal };
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error interno del servidor";
     return { success: false, error: message };

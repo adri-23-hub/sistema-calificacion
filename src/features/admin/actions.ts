@@ -1,5 +1,7 @@
 "use server";
 
+import { normalizeWeights, weightKeys } from "@/lib/config-weights";
+import { lockEdition } from "@/lib/vote-authorization";
 import { z } from "zod";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -27,44 +29,8 @@ export async function saveEventConfigAction(
     const session = await requireSession(["ADMIN"]);
     requirePermission(session.role, "config:write");
 
-    // Validar suma del 100% para pesos si aplica
-    if (key === "moduleA.weights" || key === "moduleA.criteria.weights") {
-      const v = value as Record<string, number>;
-      const sum = (Number(v.coreografia) || 0) + (Number(v.vestimenta) || 0) + (Number(v.entusiasmo) || 0);
-      const isPercent = sum > 1.5;
-      const target = isPercent ? 100 : 1.0;
-      const tol = isPercent ? 1 : 0.01;
-      if (Math.abs(sum - target) > tol) {
-        return { success: false, error: `Los pesos de la Entrada Folklórica deben sumar 100% (suma actual: ${sum}%).` };
-      }
-    }
-
-    if (key === "moduleB.criteria.weights") {
-      const v = value as Record<string, number>;
-      const sum =
-        (Number(v.porteElegancia) || 0) +
-        (Number(v.carismaSimpatia) || 0) +
-        (Number(v.autenticidadTraje) || 0) +
-        (Number(v.originalidadEstilo) || 0);
-      const isPercent = sum > 1.5;
-      const target = isPercent ? 100 : 1.0;
-      const tol = isPercent ? 1 : 0.01;
-      if (Math.abs(sum - target) > tol) {
-        return { success: false, error: `Los pesos de los 4 criterios de Moperita/Ñusta deben sumar 100% (suma actual: ${sum}%).` };
-      }
-    }
-
-    if (key === "moduleB.runway.weights") {
-      const v = value as Record<string, number>;
-      const sum = (Number(v.GALA) || 0) + (Number(v.CASUAL) || 0) + (Number(v.TIPICA) || 0);
-      const isPercent = sum > 1.5;
-      const target = isPercent ? 100 : 1.0;
-      const tol = isPercent ? 1 : 0.01;
-      if (Math.abs(sum - target) > tol) {
-        return { success: false, error: `Los pesos de las 3 pasadas deben sumar 100% (suma actual: ${sum}%).` };
-      }
-    }
-
+    if (key === "moduleA.criteria.weights") key = "moduleA.weights";
+    if (weightKeys[key]) value = normalizeWeights(value, weightKeys[key]);
     if (key === "moduleA.penalty.order" && value !== "BEFORE_AVERAGE" && value !== "AFTER_AVERAGE") {
       return { success: false, error: "El orden de penalizaciones debe ser 'BEFORE_AVERAGE' o 'AFTER_AVERAGE'." };
     }
@@ -75,37 +41,14 @@ export async function saveEventConfigAction(
 
     if (key === "general.decimals") {
       const dec = Number(value);
-      if (isNaN(dec) || dec < 0 || dec > 4) {
+      if (!Number.isInteger(dec) || dec < 0 || dec > 4) {
         return { success: false, error: "Los decimales de redondeo deben ser un número entre 0 y 4." };
       }
     }
 
-    // Verificar si hay votos existentes para claves de pesos/escalas
-    const lockedKeys = [
-      "moduleA.weights",
-      "moduleA.criteria.weights",
-      "moduleA.criteria.scale",
-      "moduleB.criteria.weights",
-      "moduleB.runway.weights",
-      "moduleB.criteria.scale",
-    ];
-
-    if (lockedKeys.includes(key)) {
-      // Verificar si hay votos en el sistema
-      const [danceScoreCount, scoreCount] = await Promise.all([
-        prisma.danceScore.count({ where: { danceGroup: { editionId }, status: "SUBMITTED" } }),
-        prisma.score.count({ where: { entry: { category: { editionId } }, status: "SUBMITTED" } }),
-      ]);
-
-      if (danceScoreCount > 0 || scoreCount > 0) {
-        return {
-          success: false,
-          error: "No se pueden modificar pesos/escalas mientras existen votos enviados. Anule los votos primero o confirme el cambio explícitamente.",
-        };
-      }
-    }
-
     await prisma.$transaction(async (tx) => {
+      await lockEdition(tx, editionId);
+      if (await tx.danceScore.count({ where: { danceGroup: { editionId }, status: "SUBMITTED" } }) || await tx.score.count({ where: { entry: { category: { editionId } }, status: "SUBMITTED" } })) throw new Error("No se puede cambiar la configuración mientras existen votos enviados.");
       const jsonValue = value as Prisma.InputJsonValue;
       await tx.eventConfig.upsert({
         where: { editionId_key: { editionId, key } },
@@ -236,46 +179,18 @@ export async function saveAllEventConfigsAction(
     }
 
     // 6. Validar decimales
-    if (decimals < 0 || decimals > 4) {
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 4) {
       return { success: false, error: "Los decimales de redondeo deben estar entre 0 y 4." };
     }
 
     // 7. Validar jurados
-    if (juryCount.moduleA < 1 || juryCount.moduleB < 1) {
+    if (!Number.isInteger(juryCount.moduleA) || !Number.isInteger(juryCount.moduleB) || juryCount.moduleA < 1 || juryCount.moduleB < 1) {
       return { success: false, error: "El número de jurados por concurso debe ser al menos 1." };
     }
 
-    // Normalizar a porcentajes / formato estándar
-    const normA = {
-      coreografia: moduleAWeights.coreografia > 1.5 ? moduleAWeights.coreografia / 100 : moduleAWeights.coreografia,
-      vestimenta: moduleAWeights.vestimenta > 1.5 ? moduleAWeights.vestimenta / 100 : moduleAWeights.vestimenta,
-      entusiasmo: moduleAWeights.entusiasmo > 1.5 ? moduleAWeights.entusiasmo / 100 : moduleAWeights.entusiasmo,
-    };
-
-    const normBCriteria = {
-      porteElegancia:
-        moduleBCriteriaWeights.porteElegancia > 1.5
-          ? moduleBCriteriaWeights.porteElegancia / 100
-          : moduleBCriteriaWeights.porteElegancia,
-      carismaSimpatia:
-        moduleBCriteriaWeights.carismaSimpatia > 1.5
-          ? moduleBCriteriaWeights.carismaSimpatia / 100
-          : moduleBCriteriaWeights.carismaSimpatia,
-      autenticidadTraje:
-        moduleBCriteriaWeights.autenticidadTraje > 1.5
-          ? moduleBCriteriaWeights.autenticidadTraje / 100
-          : moduleBCriteriaWeights.autenticidadTraje,
-      originalidadEstilo:
-        moduleBCriteriaWeights.originalidadEstilo > 1.5
-          ? moduleBCriteriaWeights.originalidadEstilo / 100
-          : moduleBCriteriaWeights.originalidadEstilo,
-    };
-
-    const normBRunways = {
-      GALA: moduleBRunwayWeights.GALA > 1.5 ? moduleBRunwayWeights.GALA / 100 : moduleBRunwayWeights.GALA,
-      CASUAL: moduleBRunwayWeights.CASUAL > 1.5 ? moduleBRunwayWeights.CASUAL / 100 : moduleBRunwayWeights.CASUAL,
-      TIPICA: moduleBRunwayWeights.TIPICA > 1.5 ? moduleBRunwayWeights.TIPICA / 100 : moduleBRunwayWeights.TIPICA,
-    };
+    const normA = normalizeWeights(moduleAWeights, weightKeys["moduleA.weights"]);
+    const normBCriteria = normalizeWeights(moduleBCriteriaWeights, weightKeys["moduleB.criteria.weights"]);
+    const normBRunways = normalizeWeights(moduleBRunwayWeights, weightKeys["moduleB.runway.weights"]);
 
     const configsToSave = [
       { key: "moduleA.weights", value: normA, desc: "Pesos de criterios — Módulo A (Coreografía, Vestimenta, Entusiasmo)" },
@@ -289,6 +204,8 @@ export async function saveAllEventConfigsAction(
     ];
 
     await prisma.$transaction(async (tx) => {
+      await lockEdition(tx, editionId);
+      if (await tx.danceScore.count({ where: { danceGroup: { editionId }, status: "SUBMITTED" } }) || await tx.score.count({ where: { entry: { category: { editionId } }, status: "SUBMITTED" } })) throw new Error("No se puede cambiar la configuración mientras existen votos enviados.");
       // Actualizar Edition con scoringRule y decimals
       await tx.edition.update({
         where: { id: editionId },

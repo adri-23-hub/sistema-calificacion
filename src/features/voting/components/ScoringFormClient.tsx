@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useState, useId } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { submitScoreAction } from "@/features/voting/actions";
 
@@ -77,7 +77,7 @@ export default function ScoringFormClient({
     submittedAt: string;
   } | null>(entry.existingScore || null);
 
-  const clientUuid = useId();
+  const clientUuid = useRef<string | null>(null);
 
   // Helper to adjust score by delta (-0.5 or +0.5)
   const adjustScore = (criterionId: string, delta: number) => {
@@ -122,7 +122,7 @@ export default function ScoringFormClient({
         rubricId: entry.rubricId,
         items,
         observations,
-        clientUuid,
+        clientUuid: clientUuid.current ?? (clientUuid.current = crypto.randomUUID()),
       });
 
       if (res.success && res.payloadHash) {
@@ -133,28 +133,10 @@ export default function ScoringFormClient({
         });
         setIsModalOpen(false);
       } else {
-        // Fallback simulation for local demonstration if DB is offline
-        const simulatedHash = `0x${Array.from(crypto.getRandomValues(new Uint8Array(20)))
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join("")}`;
-        setSealedScore({
-          rawTotal: totalScore,
-          payloadHash: simulatedHash,
-          submittedAt: new Date().toISOString(),
-        });
-        setIsModalOpen(false);
+        setSubmitError(res.error || "No se pudo confirmar el guardado de la calificación.");
       }
     } catch {
-      // Local graceful fallback
-      const simulatedHash = `0x${Array.from(crypto.getRandomValues(new Uint8Array(20)))
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("")}`;
-      setSealedScore({
-        rawTotal: totalScore,
-        payloadHash: simulatedHash,
-        submittedAt: new Date().toISOString(),
-      });
-      setIsModalOpen(false);
+      setSubmitError("No se pudo confirmar el envío. Tus notas se conservan; intenta nuevamente.");
     } finally {
       setIsSubmitting(false);
     }

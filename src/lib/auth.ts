@@ -4,9 +4,7 @@ import { cookies } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { Role } from "@prisma/client";
 
-const SECRET = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "dev-secret-change-in-production"
-);
+import { getAuthSecret, SESSION_VERSION } from "@/lib/session-config";
 
 // ─── Rate limiting config ───────────────────────────────────
 const MAX_FAILED_ATTEMPTS = 5;       // intentos antes del bloqueo
@@ -24,11 +22,11 @@ export interface SessionPayload {
  * Create a JWT session token and set it as an HTTP-only cookie.
  */
 export async function createSession(payload: SessionPayload): Promise<string> {
-  const token = await new SignJWT({ ...payload })
+  const token = await new SignJWT({ ...payload, sessionVersion: SESSION_VERSION })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("12h") // 12-hour sessions
-    .sign(SECRET);
+    .sign(getAuthSecret());
 
   const cookieStore = await cookies();
   cookieStore.set("session", token, {
@@ -51,8 +49,14 @@ export async function getSession(): Promise<SessionPayload | null> {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, SECRET);
-    return payload as unknown as SessionPayload;
+    const { payload } = await jwtVerify(token, getAuthSecret(), { algorithms: ["HS256"] });
+    if (payload.sessionVersion !== SESSION_VERSION || typeof payload.userId !== "string") return null;
+    const user = await prisma.user.findUnique({ where: { id: payload.userId } });
+    if (!user || !user.isActive || user.role !== payload.role) return null;
+    if (user.isLocked && (!user.lockedUntil || user.lockedUntil > new Date())) return null;
+    return { userId: user.id, name: user.name, role: user.role,
+      editionId: typeof payload.editionId === "string" ? payload.editionId : undefined,
+      code: user.code ?? undefined };
   } catch {
     return null;
   }
@@ -93,8 +97,9 @@ async function checkLockout(userId: string): Promise<{ locked: boolean; remainin
       select: { isLocked: true, lockedUntil: true, failedAttempts: true },
     });
 
-    if (!user) return { locked: false };
+    if (!user) return { locked: true };
 
+    if (user.isLocked && !user.lockedUntil) return { locked: true };
     if (user.isLocked && user.lockedUntil) {
       const now = new Date();
       if (now < user.lockedUntil) {
@@ -109,7 +114,7 @@ async function checkLockout(userId: string): Promise<{ locked: boolean; remainin
 
     return { locked: false };
   } catch {
-    return { locked: false };
+    return { locked: true };
   }
 }
 
@@ -154,31 +159,6 @@ async function resetFailedAttempts(userId: string): Promise<void> {
     // Silently fail if DB is down
   }
 }
-
-// ─── Demo Credentials Fallback (when PostgreSQL is offline) ─────────
-const DEMO_JURORS = [
-  { code: "JUR-01", pin: "1234", name: "Dr. Roberto Aguilar Sánchez", id: "juror-01" },
-  { code: "JUR-02", pin: "2345", name: "Lic. Carmen Rosa Flores", id: "juror-02" },
-  { code: "JUR-03", pin: "3456", name: "Prof. Eduardo Torrez Mamani", id: "juror-03" },
-  { code: "JUR-04", pin: "4567", name: "Dra. Patricia Salinas Vega", id: "juror-04" },
-  { code: "JUR-05", pin: "5678", name: "Lic. Fernando Quispe Alanoca", id: "juror-05" },
-  { code: "JUR-06", pin: "6789", name: "Prof. Silvia Guzmán Rojas", id: "juror-06" },
-  { code: "JUR-07", pin: "7890", name: "Dr. Miguel Ángel Vargas", id: "juror-07" },
-  { code: "JUR-08", pin: "8901", name: "Lic. Rosa María Condori", id: "juror-08" },
-  { code: "JUR-09", pin: "9012", name: "Prof. Juan Carlos Mendoza", id: "juror-09" },
-  { code: "JUR-10", pin: "0123", name: "Dra. Alicia Pinto Morales", id: "juror-10" },
-  { code: "JUR-11", pin: "1111", name: "Lic. César Baldivieso Cruz", id: "juror-11" },
-  { code: "JUR-12", pin: "2222", name: "Prof. Gloria Suárez Paz", id: "juror-12" },
-  { code: "JUR-13", pin: "3333", name: "Dr. Héctor Salvatierra Roca", id: "juror-13" },
-  { code: "JUR-14", pin: "4444", name: "Lic. Marta Rivero Saucedo", id: "juror-14" },
-  { code: "JUR-15", pin: "5555", name: "Prof. Luis Arce Gutiérrez", id: "juror-15" },
-];
-
-const DEMO_CONTROL = [
-  { code: "CTRL-01", pin: "1234", name: "Juan Pérez Rojas", id: "control-01" },
-  { code: "CTRL-02", pin: "2345", name: "María Flores Guzmán", id: "control-02" },
-  { code: "CTRL-03", pin: "3456", name: "Pedro Mamani Quispe", id: "control-03" },
-];
 
 /**
  * Authenticate a jury member or control staff by code + PIN.
@@ -239,43 +219,7 @@ export async function authenticateByCode(
       };
     }
   } catch (error) {
-    console.warn("Base de datos no accesible en authenticateByCode, usando validación local:", error);
-  }
-
-  // Fallback demo validation — JURADO
-  const demoJuror = DEMO_JURORS.find((j) => j.code === cleanCode);
-  if (demoJuror) {
-    if (demoJuror.pin !== pin) {
-      return { success: false, error: "PIN incorrecto para este jurado" };
-    }
-    return {
-      success: true,
-      user: {
-        userId: demoJuror.id,
-        name: demoJuror.name,
-        role: Role.JURADO,
-        editionId: "edition-2026",
-        code: demoJuror.code,
-      },
-    };
-  }
-
-  // Fallback demo validation — CONTROL
-  const demoControl = DEMO_CONTROL.find((c) => c.code === cleanCode);
-  if (demoControl) {
-    if (demoControl.pin !== pin) {
-      return { success: false, error: "PIN incorrecto para este personal de control" };
-    }
-    return {
-      success: true,
-      user: {
-        userId: demoControl.id,
-        name: demoControl.name,
-        role: Role.CONTROL,
-        editionId: "edition-2026",
-        code: demoControl.code,
-      },
-    };
+    console.warn("Base de datos no accesible en authenticateByCode, acceso rechazado:", error);
   }
 
   return { success: false, error: "Código no encontrado. Ej: JUR-01 o CTRL-01" };
@@ -333,32 +277,7 @@ export async function authenticateAdmin(
       };
     }
   } catch (error) {
-    console.warn("Base de datos no accesible en authenticateAdmin, usando validación local:", error);
-  }
-
-  // Fallback demo validation for Admin/Notario
-  if (cleanEmail === "admin@certamen.bo" && password === "admin2026") {
-    return {
-      success: true,
-      user: {
-        userId: "admin-seed-id",
-        name: "Administrador General",
-        role: Role.ADMIN,
-        editionId: "edition-2026",
-      },
-    };
-  }
-
-  if (cleanEmail === "notario@certamen.bo" && password === "notario2026") {
-    return {
-      success: true,
-      user: {
-        userId: "notario-seed-id",
-        name: "Dr. Fernando Morales Suárez",
-        role: Role.NOTARIO,
-        editionId: "edition-2026",
-      },
-    };
+    console.warn("Base de datos no accesible en authenticateAdmin, acceso rechazado:", error);
   }
 
   return { success: false, error: "Credenciales de administrador incorrectas" };

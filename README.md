@@ -40,3 +40,10 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 `npm run dev` y `npm run build` usan Webpack, compatible con Next.js 16.4.3. Turbopack falla en este entorno al iniciar el proceso de PostCSS (el proceso termina antes de conectarse). Esta elección permite compilar sin cambiar las reglas de la aplicación ni las dependencias de Next.js.
 
 Las fuentes del diseño se sirven localmente desde `src/app/fonts`, con sus licencias incluidas; la compilación no necesita descargarlas.
+
+
+### Seguridad de sesiones
+
+Configurar `AUTH_SECRET` con una clave aleatoria de al menos 32 bytes antes de iniciar o compilar. Puede generarse con `node -e "console.log(require('node:crypto').randomBytes(48).toString('base64'))"`. Guardarla en `.env.local` o en las variables privadas del alojamiento; nunca subirla al repositorio. Todos los servidores del mismo entorno deben compartir la clave.
+
+Esta versión invalida las sesiones anteriores: los usuarios deben volver a iniciar sesión. El acceso requiere una cuenta real activa en la base de datos; no existe autenticación alternativa de demostración. La configuración de producción debe actualizarse por separado.
