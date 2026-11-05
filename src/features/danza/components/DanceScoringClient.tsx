@@ -40,6 +40,8 @@ interface DanceScoringClientProps {
 
 export default function DanceScoringClient({
   group,
+  juryName,
+  juryCode,
 }: DanceScoringClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -83,30 +85,31 @@ export default function DanceScoringClient({
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* Botón Volver */}
-      <div>
+      <div className="lg:col-span-12 flex flex-wrap items-center justify-between gap-3">
         <Link
-          href="/jurado"
-          className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition-colors"
+          href="/jurado/calificar?certamen=danzas"
+          className="inline-flex items-center gap-2 text-xs font-semibold text-on-surface-variant hover:text-on-surface transition-colors"
         >
-          ← Volver a la Lista de Danzas
+          ← Elegir otra participación
         </Link>
+        <span className="text-xs text-on-surface-variant">Mesa de jurado · <strong className="text-tertiary">{juryName}</strong> · {juryCode}</span>
       </div>
 
       {/* Tarjeta de Información del Grupo */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-4">
+      <div className="lg:col-span-4 bg-surface-container-low border border-outline-variant/30 rounded-3xl p-5 shadow-xl space-y-4 lg:sticky lg:top-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex items-center gap-3">
-            <span className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-extrabold flex items-center justify-center text-lg">
+            <span className="w-12 h-12 rounded-2xl bg-tertiary/10 border border-tertiary/30 text-tertiary font-extrabold flex items-center justify-center text-lg">
               #{group.entryOrder || "—"}
             </span>
             <div>
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-tertiary/10 text-tertiary border border-tertiary/20">
                 MÓDULO A • ENTRADA FOLKLÓRICA
               </span>
-              <h1 className="text-2xl font-bold text-white mt-0.5">{group.danceName}</h1>
-              <p className="text-sm text-slate-400">{group.fraternityName}</p>
+              <h1 className="font-display text-2xl font-bold text-on-surface mt-0.5">{group.danceName}</h1>
+              <p className="text-sm text-on-surface-variant">{group.fraternityName}</p>
             </div>
           </div>
 
@@ -122,38 +125,38 @@ export default function DanceScoringClient({
                 DESCALIFICADO
               </span>
             ) : (
-              <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+              <span className="px-3 py-1.5 rounded-xl text-xs font-bold bg-tertiary/20 text-tertiary border border-tertiary/30">
                 EN CALIFICACIÓN
               </span>
             )}
           </div>
         </div>
 
-        <div className="h-48 sm:h-72 w-full rounded-2xl overflow-hidden bg-slate-950 flex items-center justify-center">
+        <div className="h-48 sm:h-72 w-full rounded-2xl overflow-hidden bg-surface-container-lowest flex items-center justify-center">
           {group.photoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={group.photoUrl} alt={group.danceName} className="w-full h-full object-contain" />
-          ) : <span className="text-slate-500 text-sm">📷 Sin fotografía del grupo</span>}
+          ) : <span className="text-on-surface-variant text-sm">📷 Sin fotografía del grupo</span>}
         </div>
 
         {/* Detalles institucionales y checklist */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950 p-4 rounded-2xl border border-slate-800/80 text-xs">
+        <div className="grid grid-cols-2 gap-3 bg-surface-container-lowest p-4 rounded-2xl border border-outline-variant/30 text-xs">
           <div>
-            <span className="text-slate-500 block">Universidad:</span>
-            <span className="text-white font-medium">{group.university}</span>
+            <span className="text-on-surface-variant block">Universidad:</span>
+            <span className="text-on-surface font-medium">{group.university}</span>
           </div>
           <div>
-            <span className="text-slate-500 block">Origen:</span>
-            <span className="text-white font-medium">{group.city}, {group.department}</span>
+            <span className="text-on-surface-variant block">Origen:</span>
+            <span className="text-on-surface font-medium">{group.city}, {group.department}</span>
           </div>
           <div>
-            <span className="text-slate-500 block">Bailarines:</span>
-            <span className={group.numberOfDancers < 50 ? "text-amber-400 font-bold" : "text-emerald-400 font-medium"}>
+            <span className="text-on-surface-variant block">Bailarines:</span>
+            <span className={group.numberOfDancers < 50 ? "text-tertiary font-bold" : "text-emerald-400 font-medium"}>
               {group.numberOfDancers} {group.numberOfDancers < 50 && "(Alerta: mín. 50)"}
             </span>
           </div>
           <div>
-            <span className="text-slate-500 block">Checklist:</span>
+            <span className="text-on-surface-variant block">Checklist:</span>
             <span className="text-emerald-400 font-medium">✓ Acreditado</span>
           </div>
         </div>
@@ -161,18 +164,18 @@ export default function DanceScoringClient({
 
       {/* Alerta de Error */}
       {errorMsg && (
-        <div className="p-4 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-sm">
+        <div className="lg:col-span-12 p-4 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-sm">
           {errorMsg}
         </div>
       )}
 
       {/* FORMULARIO DE CALIFICACIÓN O VISTA DE VOTO ENVIADO */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
+      <div className="lg:col-span-8 bg-surface-container-low border border-outline-variant/30 rounded-3xl p-6 sm:p-8 shadow-xl space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-white">
+          <h2 className="font-display text-xl font-bold text-on-surface">
             {submitted ? "Tu Calificación Emitida" : "Formulario de Calificación Oficial"}
           </h2>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-on-surface-variant mt-1">
             Escala reglamentaria de 1 a 100 puntos por criterio. Cada jurado vota una sola vez.
           </p>
         </div>
@@ -180,22 +183,22 @@ export default function DanceScoringClient({
         {/* 3 Criterios */}
         <div className="space-y-6">
           {/* Criterio 1: Coreografía */}
-          <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 space-y-3">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-tertiary uppercase tracking-wider">
                   Criterio 1 • Peso 40%
                 </span>
-                <h3 className="font-bold text-white text-base">Coreografía</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="font-bold text-on-surface text-base">Coreografía</h3>
+                <p className="text-xs text-on-surface-variant">
                   Coordinación de pasos, figuras grupales, sincronización rítmica y desplazamiento escénico.
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-amber-400 font-mono">
+                <span className="text-2xl font-black text-tertiary font-mono">
                   {coreografia}
                 </span>
-                <span className="text-xs text-slate-500 block">/ 100 pts</span>
+                <span className="text-xs text-on-surface-variant block">/ 100 pts</span>
               </div>
             </div>
 
@@ -204,30 +207,31 @@ export default function DanceScoringClient({
                 type="range"
                 min={1}
                 max={100}
+                aria-label="Puntaje de coreografía"
                 value={coreografia}
                 onChange={(e) => setCoreografia(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                className="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-tertiary"
               />
             )}
           </div>
 
           {/* Criterio 2: Vestimenta */}
-          <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 space-y-3">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-tertiary uppercase tracking-wider">
                   Criterio 2 • Peso 30%
                 </span>
-                <h3 className="font-bold text-white text-base">Vestimenta y Traje Folklórico</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="font-bold text-on-surface text-base">Vestimenta y Traje Folklórico</h3>
+                <p className="text-xs text-on-surface-variant">
                   Autenticidad cultural, confección artesanal, uniformidad, accesorios y respeto a las tradiciones.
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-amber-400 font-mono">
+                <span className="text-2xl font-black text-tertiary font-mono">
                   {vestimenta}
                 </span>
-                <span className="text-xs text-slate-500 block">/ 100 pts</span>
+                <span className="text-xs text-on-surface-variant block">/ 100 pts</span>
               </div>
             </div>
 
@@ -236,30 +240,31 @@ export default function DanceScoringClient({
                 type="range"
                 min={1}
                 max={100}
+                aria-label="Puntaje de vestimenta"
                 value={vestimenta}
                 onChange={(e) => setVestimenta(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                className="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-tertiary"
               />
             )}
           </div>
 
           {/* Criterio 3: Entusiasmo */}
-          <div className="bg-slate-950 p-5 rounded-2xl border border-slate-800 space-y-3">
+          <div className="bg-surface-container-lowest p-5 rounded-2xl border border-outline-variant/30 space-y-3">
             <div className="flex justify-between items-center">
               <div>
-                <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">
+                <span className="text-xs font-bold text-tertiary uppercase tracking-wider">
                   Criterio 3 • Peso 30%
                 </span>
-                <h3 className="font-bold text-white text-base">Entusiasmo y Expresión</h3>
-                <p className="text-xs text-slate-400">
+                <h3 className="font-bold text-on-surface text-base">Entusiasmo y Expresión</h3>
+                <p className="text-xs text-on-surface-variant">
                   Fervor festivo, alegría, conexión con el público, energía y perseverancia durante el recorrido.
                 </p>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black text-amber-400 font-mono">
+                <span className="text-2xl font-black text-tertiary font-mono">
                   {entusiasmo}
                 </span>
-                <span className="text-xs text-slate-500 block">/ 100 pts</span>
+                <span className="text-xs text-on-surface-variant block">/ 100 pts</span>
               </div>
             </div>
 
@@ -268,9 +273,10 @@ export default function DanceScoringClient({
                 type="range"
                 min={1}
                 max={100}
+                aria-label="Puntaje de entusiasmo"
                 value={entusiasmo}
                 onChange={(e) => setEntusiasmo(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-amber-500"
+                className="w-full h-2 bg-surface-container-high rounded-lg appearance-none cursor-pointer accent-tertiary"
               />
             )}
           </div>
@@ -278,7 +284,7 @@ export default function DanceScoringClient({
 
         {/* Observaciones */}
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1">
+          <label className="block text-xs font-semibold text-on-surface mb-1">
             Observaciones o Comentarios del Jurado (opcional):
           </label>
           <textarea
@@ -287,17 +293,17 @@ export default function DanceScoringClient({
             value={observations}
             onChange={(e) => setObservations(e.target.value)}
             placeholder="Anotaciones cualitativas sobre la presentación..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40 disabled:opacity-60"
+            className="w-full bg-surface-container-lowest border border-outline-variant/30 rounded-xl px-4 py-2.5 text-sm text-on-surface placeholder-on-surface-variant focus:outline-none focus:ring-2 focus:ring-tertiary/40 disabled:opacity-60"
           />
         </div>
 
         {/* Resumen Total y Botón de Envío */}
-        <div className="pt-4 border-t border-slate-800 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div className="pt-4 border-t border-outline-variant/30 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div>
-            <span className="text-xs text-slate-400 block">Nota Total Calculada:</span>
-            <div className="text-3xl font-black text-white font-mono">
+            <span className="text-xs text-on-surface-variant block">Nota Total Calculada:</span>
+            <div className="text-3xl font-black text-on-surface font-mono">
               {rawTotal.toFixed(2)}{" "}
-              <span className="text-xs font-normal text-slate-400">
+              <span className="text-xs font-normal text-on-surface-variant">
                 = ({coreografia}×0.4) + ({vestimenta}×0.3) + ({entusiasmo}×0.3)
               </span>
             </div>
@@ -307,7 +313,7 @@ export default function DanceScoringClient({
             <button
               disabled={isPending || group.isDisqualified}
               onClick={() => setShowConfirmModal(true)}
-              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-xl shadow-amber-500/20 transition-all disabled:opacity-50"
+              className="w-full sm:w-auto px-8 py-3.5 rounded-2xl font-bold text-sm bg-gradient-to-r from-tertiary to-secondary hover:from-tertiary-fixed-dim hover:to-tertiary text-on-tertiary shadow-xl shadow-tertiary/20 transition-all disabled:opacity-50"
             >
               Emitir Calificación Definitiva
             </button>
@@ -316,7 +322,7 @@ export default function DanceScoringClient({
               <span className="text-xs text-emerald-400 font-mono font-bold block">
                 ✓ Calificación Registrada e Inmutable
               </span>
-              <span className="text-[11px] text-slate-500 font-mono">
+              <span className="text-[11px] text-on-surface-variant font-mono">
                 {group.userScore?.payloadHash ? `Hash: ${group.userScore.payloadHash.slice(0, 20)}...` : ""}
               </span>
             </div>
@@ -326,53 +332,53 @@ export default function DanceScoringClient({
 
       {/* MODAL DE CONFIRMACIÓN DE VOTO ÚNICO */}
       {showConfirmModal && (
-        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="app-dialog-panel bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
-            <div className="w-12 h-12 bg-amber-500/10 border border-amber-500/30 rounded-2xl flex items-center justify-center text-2xl">
+        <div className="app-dialog-overlay fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-container-lowest/80 backdrop-blur-sm">
+          <div className="app-dialog-panel bg-surface-container-low border border-outline-variant/30 rounded-3xl max-w-md w-full p-6 sm:p-8 space-y-5 shadow-2xl">
+            <div className="w-12 h-12 bg-tertiary/10 border border-tertiary/30 rounded-2xl flex items-center justify-center text-2xl">
               ⚠️
             </div>
             <div>
-              <h3 className="text-xl font-bold text-white">¿Confirmas el envío definitivo?</h3>
-              <p className="text-xs sm:text-sm text-slate-300 mt-2 leading-relaxed">
+              <h3 className="text-xl font-bold text-on-surface">¿Confirmas el envío definitivo?</h3>
+              <p className="text-xs sm:text-sm text-on-surface mt-2 leading-relaxed">
                 Cada jurado vota <strong>UNA sola vez</strong> por grupo. Una vez enviada, tu calificación quedará
                 bloqueada criptográficamente en la base de datos y <strong>no podrás editarla ni anularla</strong>.
               </p>
             </div>
 
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1 text-xs">
+            <div className="bg-surface-container-lowest p-4 rounded-xl border border-outline-variant/30 space-y-1 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-400">Grupo:</span>
-                <span className="text-white font-bold">{group.danceName}</span>
+                <span className="text-on-surface-variant">Grupo:</span>
+                <span className="text-on-surface font-bold">{group.danceName}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Coreografía (40%):</span>
-                <span className="text-white font-mono">{coreografia} pts</span>
+                <span className="text-on-surface-variant">Coreografía (40%):</span>
+                <span className="text-on-surface font-mono">{coreografia} pts</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Vestimenta (30%):</span>
-                <span className="text-white font-mono">{vestimenta} pts</span>
+                <span className="text-on-surface-variant">Vestimenta (30%):</span>
+                <span className="text-on-surface font-mono">{vestimenta} pts</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Entusiasmo (30%):</span>
-                <span className="text-white font-mono">{entusiasmo} pts</span>
+                <span className="text-on-surface-variant">Entusiasmo (30%):</span>
+                <span className="text-on-surface font-mono">{entusiasmo} pts</span>
               </div>
-              <div className="flex justify-between pt-1 border-t border-slate-800 font-bold">
-                <span className="text-amber-400">Nota Total:</span>
-                <span className="text-amber-400 font-mono text-sm">{rawTotal.toFixed(2)} pts</span>
+              <div className="flex justify-between pt-1 border-t border-outline-variant/30 font-bold">
+                <span className="text-tertiary">Nota Total:</span>
+                <span className="text-tertiary font-mono text-sm">{rawTotal.toFixed(2)} pts</span>
               </div>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-slate-400 hover:text-white"
+                className="px-4 py-2.5 rounded-xl text-xs font-semibold text-on-surface-variant hover:text-on-surface"
               >
                 Revisar Calificación
               </button>
               <button
                 disabled={isPending}
                 onClick={handleSubmit}
-                className="px-6 py-2.5 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-lg shadow-amber-500/20 disabled:opacity-50"
+                className="px-6 py-2.5 rounded-xl text-xs font-bold bg-tertiary hover:bg-tertiary-fixed-dim text-on-tertiary shadow-lg shadow-tertiary/20 disabled:opacity-50"
               >
                 {isPending ? "Enviando Voto..." : "Sí, Confirmar y Bloquear"}
               </button>
