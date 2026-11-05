@@ -14,7 +14,7 @@ export default async function JuradoMenuPage() {
   // Estadísticas del jurado y estado del certamen en vivo
   let evaluatedCount = 2;
   let totalDancesCount = 36;
-  let activeEntryId = "mop-03";
+
   let activeEntryName = "Ariadna Melgar Saucedo (UNIVALLE)";
   let activeDanceTitle = "Danza del Sol y la Luna (Sirionó)";
 
@@ -45,7 +45,7 @@ export default async function JuradoMenuPage() {
     });
 
     if (liveEntry) {
-      activeEntryId = liveEntry.id;
+
       activeEntryName = `${liveEntry.participant.fullName} (${liveEntry.participant.fraternity.university || liveEntry.category.name})`;
       activeDanceTitle = liveEntry.participant.fraternity.name;
     }
@@ -221,9 +221,9 @@ export default async function JuradoMenuPage() {
             </div>
           </Link>
 
-          {/* Card 03: Emitir Voto en Vivo */}
+          {/* Card 03: Elegir certamen y votar */}
           <Link
-            href={`/jurado/calificar/${activeEntryId}`}
+            href="/jurado/calificar"
             className="group relative flex flex-col gap-3 bg-[#0a2e1d]/80 backdrop-blur-xl border border-tertiary/40 rounded-[18px] p-5 sm:p-6 text-inherit no-underline transition-all duration-200 hover:-translate-y-1 hover:border-[#f5bf00] hover:shadow-[0_20px_45px_-15px_rgba(245,191,0,0.3)] focus-visible:outline-2 focus-visible:outline-[#f5bf00] overflow-hidden ring-1 ring-tertiary/20"
           >
             {/* Top gold bar with pulse */}
@@ -241,7 +241,7 @@ export default async function JuradoMenuPage() {
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <h3 className="font-display text-[19px] font-extrabold text-[#f4fbf6] leading-[1.32] group-hover:text-tertiary transition-colors">
-                  Emitir Voto en Vivo
+                  Elegir certamen y votar
                 </h3>
               </div>
               {/* Badge indicando danza actual en escenario */}
@@ -253,7 +253,7 @@ export default async function JuradoMenuPage() {
             </div>
 
             <p className="text-on-surface-variant text-[13.5px] leading-[1.58] flex-1">
-              Puntaje táctil por los 4 criterios oficiales (40 pts máx.) con confirmación cifrada.
+              Elige Entrada Folklórica, Moperita o Ñusta y califica una participación abierta de tu mesa.
             </p>
 
             <div className="pt-2">
