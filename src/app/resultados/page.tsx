@@ -1,5 +1,5 @@
 import { getLiveResults } from "@/lib/live-results";
-import ResultadosClient from "@/features/resultados/ResultadosClient";
+import LiveResultsClient from "@/features/live/LiveResultsClient";
 
 export const dynamic = "force-dynamic";
 
@@ -25,5 +25,5 @@ export default async function ResultadosPage() {
     );
   }
 
-  return <ResultadosClient initialData={initialData} />;
+  return <LiveResultsClient initialData={initialData} />;
 }

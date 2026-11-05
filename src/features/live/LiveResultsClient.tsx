@@ -47,7 +47,7 @@ export default function LiveResultsClient({ initialData }: { initialData: LiveRe
       </section>
       <div className={styles.status}><span className={styles.live}><i /> {isFinal ? "RESULTADOS FINALES" : "RESULTADOS PRELIMINARES"}</span><span aria-live="polite">{isRefreshing ? "Actualizando…" : `Actualizado ${updated}`}</span><button onClick={toggleFullscreen} type="button"><Icon>fullscreen</Icon>{fullscreen ? "Salir" : "Pantalla completa"}</button></div>
       <section className={styles.classification}>
-        <div className={styles.tableHeading}><div><p className={styles.eyebrow}>EL CERTAMEN, EN DIRECTO</p><h2>Clasificación general</h2></div><Link href="/resultados">Ver detalle completo <span aria-hidden="true">↗</span></Link></div>
+        <div className={styles.tableHeading}><div><p className={styles.eyebrow}>EL CERTAMEN, EN DIRECTO</p><h2>Clasificación general</h2></div><Link href="/resultados/detalle">Ver detalle completo <span aria-hidden="true">↗</span></Link></div>
         <div className={styles.tableScroll}><table><thead><tr><th>Puesto</th><th>{dances ? "Danza / Fraternidad" : "Candidata / Fraternidad"}</th><th>Votos</th><th>Puntaje</th></tr></thead><tbody>{items.map(item => <tr key={item.id}><td>{item.rank ? String(item.rank).padStart(2,"0") : "—"}</td><td><strong>{nameOf(item)}</strong><small>{item.fraternityName} · {item.university}</small></td><td>{item.votesCount}/{expectedVotes(item)}</td><td>{item.rank ? scoreOf(item).toFixed(2) : "—"}</td></tr>)}</tbody></table>{!items.length && <p className={styles.noItems}>No hay participantes registrados en este concurso.</p>}</div>
       </section>
       <footer className={styles.footer}><span>{data.edition.name} · {data.edition.year}</span><span>CUB · FUL-UABJB</span></footer>
