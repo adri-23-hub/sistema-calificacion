@@ -31,13 +31,9 @@ export default function LiveResultsClient({ initialData }: { initialData: LiveRe
     try { if (document.fullscreenElement) await document.exitFullscreen(); else await document.documentElement.requestFullscreen(); setFullscreen(Boolean(document.fullscreenElement)); } catch { /* Optional browser capability. */ }
   }
   return <div className={styles.page}>
-    <nav className={styles.nav} aria-label="Navegación principal">
-      <div><Link href="/jurado/danzas">Lista de danzas</Link><Link href="/jurado/mis-calificaciones">Mi calificación</Link><Link href="/admin">Panel administrador</Link><Link href="/resultados">Resultados & podio</Link></div>
-      <span className={styles.live}><i /> EN VIVO</span>
-    </nav>
     <main className={styles.main}>
       <header className={styles.heading}>
-        <div><p className={styles.eyebrow}>TRINIDAD · {data.edition.year} / {data.edition.venue}</p><h1>RESULTADOS {isFinal ? "FINALES" : "EN VIVO"} &<br /> PODIO</h1><p className={styles.intro}>Sigue las posiciones de <strong>{title} {data.edition.year}</strong> en la {data.edition.name}.<br /><span>{isFinal ? "Calificaciones cerradas · Resultados finales." : "Escrutinio en curso · Las posiciones pueden cambiar."}</span></p></div>
+        <div><p className={styles.eyebrow}>TRINIDAD · {data.edition.year} / {data.edition.venue}</p><h1>RESULTADOS {isFinal ? "FINALES" : "EN VIVO"} & PODIO</h1><p className={styles.intro}>Sigue las posiciones de <strong>{title} {data.edition.year}</strong> en la {data.edition.name}.<br /><span>{isFinal ? "Calificaciones cerradas · Resultados finales." : "Escrutinio en curso · Las posiciones pueden cambiar."}</span></p></div>
         <div className={styles.stats}><div><Icon>how_to_vote</Icon><p><small>VOTOS EMITIDOS</small><strong>{percent}% <span>({votes}/{expected})</span></strong></p></div><div><Icon>workspace_premium</Icon><p><small>MAYOR PUNTAJE ACTUAL</small><strong className={styles.gold}>{ranked[0] ? scoreOf(ranked[0]).toFixed(2) : "—"} <span>puntos</span></strong></p></div></div>
       </header>
       {error && <div role="alert" className={styles.error}>{error} · Mostrando la última actualización disponible.</div>}
