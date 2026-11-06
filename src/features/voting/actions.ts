@@ -32,7 +32,11 @@ export async function submitScoreAction(input: SubmitScoreInput): Promise<Submit
       if (entry.category.activeRubricId !== rubricId) throw new Error("La rúbrica no es la vigente.");
       const rubric = await tx.rubric.findUnique({ where: { id: rubricId }, include: { criteria: true } });
       if (!rubric || rubric.status !== "ACTIVE" || rubric.categoryId !== entry.categoryId) throw new Error("Rúbrica inválida.");
-      const criteria = rubric.criteria.filter(c => !c.appliesToRunway || c.appliesToRunway === entry.runway?.type);
+      // Decisión provisional: el formulario muestra y envía todos los criterios
+      // de la rúbrica activa. No filtrar por appliesToRunway aquí: hacerlo
+      // desalinea la UI y bloquea el voto. Confirmar con la organización si
+      // los 4 criterios se evalúan en las 3 pasadas.
+      const criteria = rubric.criteria;
       if (new Set(items.map(i => i.criterionId)).size !== items.length || items.length !== criteria.length || criteria.some(c => !items.some(i => i.criterionId === c.id && i.points <= c.maxPoints))) throw new Error("Se requieren todos los criterios válidos, sin duplicados y dentro de sus límites.");
       const rawTotal = Math.round(items.reduce((sum,i) => sum+i.points,0)*100)/100;
       const sumWeights = criteria.reduce((sum,c) => sum+c.weight,0);

@@ -14,3 +14,29 @@ it.each([NaN, Infinity, -1, 11])("rechaza nota %s", async points => { expect((aw
 it.each([null, { isActive: false }, { isActive: true, edition: { status: "CLOSED" } }, { isActive: true, edition: { status: "ACTIVE" }, user: { isActive: true, role: "JURADO" }, assignedModule: "ENTRADA_FOLKLORICA" }])("rechaza asignación %j", async assignment => { m.assignment.mockResolvedValue(assignment); expect((await submitScoreAction(input)).success).toBe(false); expect(m.create).not.toHaveBeenCalled(); });
 it.each([{ status: "CLOSED" }, { votingOpensAt: new Date(Date.now()+60000) }, { votingClosesAt: new Date(0) }])("rechaza votación fuera de plazo %j", async change => { m.entry.mockResolvedValue({ ...entry, ...change }); expect((await submitScoreAction(input)).success).toBe(false); });
 it("rechaza criterios ajenos o duplicados", async () => { for (const items of [[{ criterionId: "other", points: 8 }], [...input.items, ...input.items]]) expect((await submitScoreAction({ ...input, items })).success).toBe(false); expect(m.create).not.toHaveBeenCalled(); });
+it("acepta los cuatro criterios aunque algunos estén restringidos a una pasarela", async () => {
+  const criteria = [
+    { id: "c1", maxPoints: 10, weight: 0.25, appliesToRunway: null },
+    { id: "c2", maxPoints: 10, weight: 0.25, appliesToRunway: null },
+    { id: "c3", maxPoints: 10, weight: 0.25, appliesToRunway: "TIPICA" },
+    { id: "c4", maxPoints: 10, weight: 0.25, appliesToRunway: "CASUAL" },
+  ];
+  m.entry.mockResolvedValue({ ...entry, runway: { type: "CASUAL" } });
+  m.rubric.mockResolvedValue({ status: "ACTIVE", categoryId: "cat", criteria });
+  const items = criteria.map(c => ({ criterionId: c.id, points: 8 }));
+  expect(await submitScoreAction({ ...input, items })).toMatchObject({ success: true, scoreId: "persisted" });
+  expect(m.create).toHaveBeenCalledTimes(1);
+});
+it("rechaza si falta uno de los criterios de la rúbrica", async () => {
+  const criteria = [
+    { id: "c1", maxPoints: 10, weight: 0.25, appliesToRunway: null },
+    { id: "c2", maxPoints: 10, weight: 0.25, appliesToRunway: null },
+    { id: "c3", maxPoints: 10, weight: 0.25, appliesToRunway: "TIPICA" },
+    { id: "c4", maxPoints: 10, weight: 0.25, appliesToRunway: "CASUAL" },
+  ];
+  m.entry.mockResolvedValue({ ...entry, runway: { type: "CASUAL" } });
+  m.rubric.mockResolvedValue({ status: "ACTIVE", categoryId: "cat", criteria });
+  const items = criteria.slice(0, 3).map(c => ({ criterionId: c.id, points: 8 }));
+  expect((await submitScoreAction({ ...input, items })).success).toBe(false);
+  expect(m.create).not.toHaveBeenCalled();
+});

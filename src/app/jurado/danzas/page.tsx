@@ -653,6 +653,7 @@ export default async function JuradoPage() {
         where: { category: { editionId: edition.id } },
         include: {
           category: true,
+          runway: true,
           participant: {
             include: { fraternity: true },
           },
@@ -670,14 +671,25 @@ export default async function JuradoPage() {
       });
 
 
-      const candidateItems: DanceItem[] = entries.map((e) => {
+      const uniqueCandidates = [...new Map(entries.map(e => [e.participantId, e])).values()];
+      const now = new Date();
+      const candidateItems: DanceItem[] = uniqueCandidates.map((e) => {
+        const turns = entries.filter(turn => turn.participantId === e.participantId);
+        const rounds = (["GALA", "CASUAL", "TIPICA"] as const).map(type => {
+          const turn = turns.find(t => t.runway?.type === type);
+          const voted = Boolean(turn?.scores.length);
+          const closed = turn?.status === "CLOSED" || turn?.category.status === "CLOSED" || Boolean(turn?.votingClosesAt && now >= turn.votingClosesAt);
+          const open = turn && !closed && turn.status === "IN_SCORING" && ["OPEN", "VOTING"].includes(turn.category.status) && Boolean(turn.category.activeRubricId) && (!turn.votingOpensAt || now >= turn.votingOpensAt);
+          return { type, name: type === "GALA" ? "Gala" : type === "CASUAL" ? "Casual" : "Típica", status: voted ? "voted" as const : closed ? "closed" as const : open ? "open" as const : "pending" as const, href: !voted && open ? "/jurado/calificar/" + turn.id : undefined, actaHref: turn && voted ? "/jurado/calificar/" + turn.id : undefined };
+        });
         const userScore = e.scores[0];
         const assignedPhoto = e.participant.photoUrl;
 
         return {
-          id: e.id,
+          id: e.participantId,
+          candidate: { order: Math.min(...turns.map(t => t.order)), categoryName: e.category.name, university: e.participant.fraternity.university, location: [e.participant.fraternity.department, e.participant.fraternity.city].filter(Boolean).join(" • "), id: e.participantId, name: e.participant.fullName, photoUrl: assignedPhoto, fraternity: e.participant.fraternity.name, rounds },
           order: e.order,
-          status: e.status === "IN_SCORING" ? "ACTIVE" : (e.status as "PENDING" | "CLOSED"),
+          status: rounds.some(r => r.status === "open") ? "ACTIVE" : rounds.every(r => r.status === "closed" || r.status === "voted") ? "CLOSED" : "PENDING",
           categoryName: e.category.name,
           categorySlug: e.category.slug,
           danceName:
